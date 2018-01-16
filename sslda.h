@@ -1,14 +1,12 @@
-// Latent Dirichlet Allocation supervised by penalised Cox proportional hazards modelling with optional learning of asymmetrical priors.
+// (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei
 
-//This has been developed from the original code (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei ([1] Blei DM, McAuliffe JD. Supervised Topic Models. Adv Neural Inf Process Syst 20 2007:121–8.) and modified following the algorithms developed by Ye et al. 2014 ([1] Ye S, Dawson JA, Kendziorski C. Extending information retrieval methods to personalized genomic-based studies of disease. Cancer Inform 2014;13:85–95. doi:10.4137/CIN.S16354.)
-
-// Modifications by Colin Crooks (colin.crooks@nottingham.ac.uk)
+// written by Chong Wang, chongw@cs.princeton.edu
 
 // This file is part of sslda.
 
 // sslda is free software; you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free
-// Software Foundation; either version 3 of the License, or (at your
+// Software Foundation; either version 2 of the License, or (at your
 // option) any later version.
 
 // sslda is distributed in the hope that it will be useful, but WITHOUT
@@ -67,7 +65,6 @@ public:
     int load_model(const char * model_filename);
 	void save_gamma(const char* filename, double** gamma, int num_docs);
 	void save_zbar(const char* filename, double** z_bar, int num_docs);
-	void save_expected_combined_prob(double ** Expectedcombprob);
     
 	suffstats * new_suffstats(int num_docs);   
     void free_suffstats(suffstats* ss);
@@ -75,7 +72,7 @@ public:
 	void random_initialize_ss(suffstats* ss, const corpus * c, const settings* setting);
     void corpus_initialize_ss(suffstats* ss, const corpus * c, const settings* setting);
 
-	int v_em(const corpus* c, const settings * setting, const char* start, const char* directory , const corpus * c_val );
+	int v_em(const corpus* c, const settings * setting, const char* start, const char* directory /*, const corpus * c_val*/ );
 	double mle(suffstats* ss, int beta_update, const settings * setting);
 	double coxonly(const corpus* c, const settings * setting);
 	double doc_e_step(document* doc, int docN,  double* gamma, double** phi, double* oldphi, double* dig, double* cbhz_params,  suffstats * ss, int beta_update, const double var_converged, const int var_max_iter);

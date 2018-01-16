@@ -1,12 +1,12 @@
-// Latent Dirichlet Allocation supervised by penalised Cox proportional hazards modelling with optional learning of asymmetrical priors.
+// (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei
 
-//This has been developed from the original code (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei ([1] Blei DM, McAuliffe JD. Supervised Topic Models. Adv Neural Inf Process Syst 20 2007:121–8.) and modified following the algorithms developed by Ye et al. 2014 ([1] Ye S, Dawson JA, Kendziorski C. Extending information retrieval methods to personalized genomic-based studies of disease. Cancer Inform 2014;13:85–95. doi:10.4137/CIN.S16354.)
+// written by Chong Wang, chongw@cs.princeton.edu
 
-// Modifications by Colin Crooks (colin.crooks@nottingham.ac.uk)
+// This file is part of sslda.
 
 // sslda is free software; you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free
-// Software Foundation; either version 3 of the License, or (at your
+// Software Foundation; either version 2 of the License, or (at your
 // option) any later version.
 
 // sslda is distributed in the hope that it will be useful, but WITHOUT
@@ -109,8 +109,6 @@ void sslda::init(double alpha_, int num_topics_,
 	topic_beta = new double  [num_topics];
 	for (int k = 0; k < num_topics; k++)
 		topic_beta[k] = 0.0;
-	//for (int i = num_topics - 1; i >= 0; i--)
-	//	topic_beta[i] = 0.0; //(1.0 - static_cast<double>(i) / static_cast<double>(num_topics - 1)) / 4.0 ;
 
 
 	if (covariatesN > 0)
@@ -416,24 +414,7 @@ void sslda::random_initialize_ss(suffstats * ss, const corpus* c, const settings
 			total += ss->z_bar[d][k];
 		}
 	}
-		/*ss->z_bar[d][num_topics - 1] = setting->WT;
-		total += ss->z_bar[d][num_topics - 1];
-        for (k = 0; k < num_topics; k ++)
-            ss->z_bar[d][k] /= total;*/
-		/**Background topic**/
-		/*
-		for (int n = 0; n < c->docs[d]->length; n++)
-		{
-			log_prob_w[num_topics - 1][c->docs[d]->words[n]] += c->docs[d]->counts[n];
-		}
-    }
-	for (w = 0; w < size_vocab; w++)
-	{
-		if(log_prob_w[num_topics - 1][w]  > 0)
-			log_prob_w[num_topics - 1][w] = log(log_prob_w[num_topics - 1][w]) - log( c->num_total_words);
-		else
-			log_prob_w[num_topics - 1][w] = -800;
-	}*/
+		
 
     int j  = 0;
 	int * gj = new int[setting->CROSSVAL];
@@ -494,7 +475,7 @@ void sslda::corpus_initialize_ss(suffstats* ss, const corpus* c, const settings*
 	time_t seed;
 	time(&seed);
 	rng.seed(static_cast<int>(seed));
-	int k = 0, n = 0, d = 0 , g = 0, i = 0, w = 0;
+	int k = 0, n = 0, d = 0, g = 0, i = 0, w = 0;
 	boost::random::uniform_01<double> rng_uniform;
 	for (k = 0; k < num_topics; k++)
 	{
@@ -531,24 +512,8 @@ void sslda::corpus_initialize_ss(suffstats* ss, const corpus* c, const settings*
 			ss->z_bar[d][k] = rng_uniform(rng);
 			total += ss->z_bar[d][k];
 		}
-		/*ss->z_bar[d][num_topics - 1] = setting->WT;
-		total += ss->z_bar[d][num_topics - 1];
-		for (k = 0; k < num_topics; k++)
-		ss->z_bar[d][k] /= total;*/
+
 	}
-		/**Background topic**//*
-		for (int n = 0; n < c->docs[d]->length; n++)
-		{
-			log_prob_w[num_topics - 1][c->docs[d]->words[n]] += c->docs[d]->counts[n];
-		}
-	}
-	for (w = 0; w < size_vocab; w++)
-	{
-		if (log_prob_w[num_topics - 1][w]  > 0)
-			log_prob_w[num_topics - 1][w] = log(log_prob_w[num_topics - 1][w]) - log(c->num_total_words);
-		else
-			log_prob_w[num_topics - 1][w] = -800;
-	}*/
 
 	int j = 0;
 	int * gj = new int[setting->CROSSVAL];
@@ -596,7 +561,7 @@ void sslda::corpus_initialize_ss(suffstats* ss, const corpus* c, const settings*
 	}
 	ss->mark[0][setting->CROSSVAL] = j + ss->labels[0];
 	delete[] gj;
-	gj = nullptr; 
+	gj = nullptr;
 	for (k = 0; k < num_topics; k++) ss->alpha_ss[k] = 0.0;
 }
 
@@ -680,7 +645,7 @@ void sslda::free_suffstats(suffstats * ss)
 
 
 int sslda::v_em(const corpus * c, const settings * setting,
-	const char * start, const char * directory , const corpus * c_val )
+	const char * start, const char * directory /*, const corpus * c_val*/ )
 {
 	const int max_length = c->max_length;
 	double **var_gamma;
@@ -693,52 +658,15 @@ int sslda::v_em(const corpus * c, const settings * setting,
 	for (k = 0; k < num_topics; k++) std::cout << alpha[k] << ", ";
 	std::cout<< std::endl;
 	std::cout <<"Number of topics = " << num_topics << std::endl;
-	// allocate variational parameters~
-	//double * wordcounts = new double[size_vocab];
-	//double * wordterms = new double[size_vocab];
-	//for (n = 0; n < size_vocab; n++)
-	//{
-	//	wordcounts[n] = 0.0;
-	//	wordterms[n] = 0.0;
-	//}
+
 	var_gamma = new double *[c->num_docs];
 	for (d = 0; d < c->num_docs; d++)
 	{
 		var_gamma[d] = new double[num_topics];
 		for (k = 0; k < num_topics; k++)
 			var_gamma[d][k] = 0.0;
-		//for (n = 0; n < c->docs[d]->length; n++)
-		//	wordcounts[c->docs[d]->words[n]] += c->docs[d]->counts[n];
 	}
 	
-	//for (n = 0; n < size_vocab; n++)
-	//	std::cout << wordcounts[n] << ", ";
-	//std::cout << std::endl;
-	/*
-	for (d = 0; d < c->num_docs; d++)
-	{
-		std::cout << "doc " << d << ": ";
-		for (int n = 0; n < c->docs[d]->length; n++)
-		{
-			c->docs[d]->counts[n] = 
-				log(c->docs[d]->counts[n]) - log(c->docs[d]->total) -
-				log(wordcounts[c->docs[d]->words[n]]) + log(c->num_total_words);
-			if (c->docs[d]->counts[n] < 0.1 || isnan(c->docs[d]->counts[n]))
-			{
-				c->docs[d]->counts[n] = 0.1;
-			}
-			std::cout << c->docs[d]->counts[n] << ", ";
-		}
-		std::cout << std::endl;
-	}*/
-
-
-
-
-//	std::cout <<" removing " <<c->size_vocab - size_vocab <<" words"<< std::endl;
-//	delete[] wordcounts;
-	
-
 	events = new int[event_times];
 	for (int r = 0; r < event_times; r++)
 	{
@@ -891,7 +819,7 @@ int sslda::v_em(const corpus * c, const settings * setting,
 		std::cout << "**** M - Step ****" <<std::endl;
 
 		f = mle(ss, BETA_UPDATE, setting);
-		likelihood += ldelta;
+		if (setting->includeETA==1)		likelihood += ldelta;
 		///////  check for convergence    /////// 
 		converged = (likelihood_old - likelihood) / likelihood_old;
 		if (converged < 0) 
@@ -911,89 +839,15 @@ int sslda::v_em(const corpus * c, const settings * setting,
 			em_converged /= 10;
 		}
 		std::cout << "Var converged = " << var_converged << " EM converged = " << em_converged << std::endl;
-		//////// Held out data
-		if (c_val != nullptr)
-		{
-			double p_val = 0.0;
-			double lik_val = 0.0;
-			 infer_only(c_val, setting, &p_val, &lik_val , directory, 0 );
-	 	}
+
 	}
-
-	//
-	///*******************Run Lasso regression to set coefficients to zero for groups with miminal effect **************/
-	//const int nt = num_topics + covariatesN;
-
-	//double ** var = new double *[ss->num_docs];
-	//for (d = 0; d < ss->num_docs; d++)
+	//////// Held out data
+	//if (c_val != nullptr)
 	//{
-	//	var[d] = new double[nt];
-	//	for (int w = 0; w < covariatesN; w++)
-	//		var[d][w] = ss->covariates[d][w];
-	//	for (int w = covariatesN; w < nt; w++)
-	//		var[d][w] = ss->z_bar[d][w - covariatesN]; //centering the variables seemed to make the E step more unstable
+	//	double p_val = 0.0;
+	//	double lik_val = 0.0;
+	//	infer_only(c_val, setting, &p_val, &lik_val, directory, 0);
 	//}
-	//double * zbeta = new double[ss->num_docs];
-	//for (int dd = 0; dd < ss->num_docs; dd++)
-	//	zbeta[dd] = 0.0;
-
-	//double * newbeta = new double[nt];
-	//for (k = 0; k < covariatesN; k++)
-	//	newbeta[k] = cov_beta[k];
-
-	//for (k = covariatesN; k < nt; k++)
-	//	newbeta[k] = topic_beta[k - covariatesN]; //log scale so dividing by the smallest beta.
-
-	//int miter = cox_lasso(newbeta, zbeta,	var, nt, 1.0 / lambda,  ss, &f, setting);
-	//
-	//std::cout << std::endl << "Lasso iter = " << miter << ", lambda = " << lambda << ", f = " << f << std::endl;
-
-	//std::cout << "Coefficients from lasso regression : ";
-	//for (k = 0; k < nt; k++)
-	//	std::cout << newbeta[k] << ", ";
-	//std::cout << std::endl;
-
-	//for (k = 0; k < covariatesN; k++)
-	//	cov_beta[k] = newbeta[k];
-	//for (k = covariatesN; k < nt; k++)
-	//	topic_beta[k - covariatesN] = newbeta[k];
-	////minbeta = 0.0;
-	////for (int k = 0; k < num_topics; k++)
-	////	minbeta = topic_beta[k] < minbeta ? topic_beta[k] : minbeta;
-	////for (int k = 0; k < num_topics; k++)
-	////	topic_beta[k] -= minbeta;
-
-	//for (int r = 0; r < event_times; r++)
-	//	basehaz[r] = 0.0;
-	//xb = 0.0;
-	//double xb2 = 0.0, exb = 0.0, exb2 = 0.0;
-	//for (d = (ss->num_docs) - 1; d >= 0; d--)
-	//{
-	//	xb2 = 0.0;
-	//	exb2 = 0.0;
-	//	for (int w = 0; w < nt; w++)
-	//	{
-	//		xb2 += newbeta[w] * var[d][w];
-	//		if (ss->labels[d] > 0)
-	//			exb2 += newbeta[w] * var[d][w];
-	//	}
-
-	//	exb = log_sum(exb, exb2);
-	//	xb = log_sum(xb, xb2); //  log(exp(xb)+exp(xb2))
-	//	if (d == 0 || ss->times[d] != ss->times[d - 1])
-	//	{
-	//		for (i = 0; i < events[ss->times[d] - 1]; i++)
-	//			basehaz[ss->times[d] - 1] += 1.0 / (exp(xb) - ((static_cast<double>(i) / static_cast<double>(events[ss->times[d] - 1])) * exp(exb)));
-	//		exb = 0.0;
-
-	//		if (isn(basehaz[ss->times[d] - 1]) || basehaz[ss->times[d] - 1] < 1e-100)
-	//			basehaz[ss->times[d] - 1] = 1e-100; //log(basehaz) required so a minimum measureable hazard is required to avoid NaN errors.
-	//	}
-	//	delete[] var[d];
-	//}
-	//delete[] var;
-	//var = nullptr;
-	
 
 	///////  output the final model    /////// 
 	
@@ -1030,8 +884,6 @@ int sslda::v_em(const corpus * c, const settings * setting,
 		delete[] var_gamma[d];
 	delete[] var_gamma;
 	var_gamma = nullptr;
-//	delete[] doclik;
-//	doclik = nullptr;
 	return 1;
 }
 
@@ -1041,41 +893,70 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 {
 	int  i, j, k, w, d;
 	double * xb = new double[event_times]; //denomimator for hazard of people at risk at each time point
-	double  xb2 = 0.0, exb= 0.0, exb2 = 0.0;
-	double eta_sum{ 0 };
-	double * eta_ss = new double[size_vocab];
-	for (w = 0; w < size_vocab; w++)
+	double  xb2 = 0.0, exb = 0.0, exb2 = 0.0;
+
+	if (setting->includeETA == 1)
 	{
-		eta_sum += eta[w];
-		eta_ss[w] = 0;
-	}
-	ldelta = boost::math::lgamma(eta_sum);
-	for (w = 0; w < size_vocab; w++)
-	{
-		ldelta -= boost::math::lgamma(eta[w]);
-	}
-	for (k = 0; k < num_topics; k++)
-	{
-		double normaliser = 0.0;
+		double eta_sum{ 0 };
+		double * eta_ss = nullptr;
+		eta_ss = new double[size_vocab];
 		for (w = 0; w < size_vocab; w++)
 		{
-			delta[k][w] = eta[k] + ss->word_ss[k][w];
-			ddelta[k][w] = boost::math::digamma(delta[k][w]) - boost::math::digamma(eta_sum + ss->word_total_ss[k]);
-			ldelta += ((eta[w] - 1.0) * ddelta[k][w]) 
-				+ boost::math::lgamma(delta[k][w])
-				- ((delta[k][w] - 1.0) *ddelta[k][w]);
-				//	log_prob_w[k][w] = log(ss->word_ss[k][w]) - log(ss->word_total_ss[k]);
-
-			if (ddelta[k][w] < -800 )
-				ddelta[k][w] = -800;
-			normaliser += delta[k][w];
-			eta_ss[w] += ddelta[k][w];
+			eta_sum += eta[w];
+			eta_ss[w] = 0;
 		}
-		ldelta -= boost::math::lgamma(normaliser);
+		ldelta = boost::math::lgamma(eta_sum);
 		for (w = 0; w < size_vocab; w++)
-			log_prob_w[k][w] = log(delta[k][w]) - log(normaliser);
-	}
+		{
+			ldelta -= boost::math::lgamma(eta[w]);
+		}
 
+		for (k = 0; k < num_topics; k++)
+		{
+			double normaliser = 0.0;
+			for (w = 0; w < size_vocab; w++)
+			{
+				delta[k][w] = eta[k] + ss->word_ss[k][w];
+				ddelta[k][w] = boost::math::digamma(delta[k][w]) - boost::math::digamma(eta_sum + ss->word_total_ss[k]);
+				ldelta += ((eta[w] - 1.0) * ddelta[k][w])
+					+ boost::math::lgamma(delta[k][w])
+					- ((delta[k][w] - 1.0) *ddelta[k][w]);
+				if (ddelta[k][w] < -800)
+					ddelta[k][w] = -800;
+				normaliser += delta[k][w];
+				eta_ss[w] += ddelta[k][w];
+			}
+			ldelta -= boost::math::lgamma(normaliser);
+			for (w = 0; w < size_vocab; w++)
+				log_prob_w[k][w] = log(delta[k][w]) - log(normaliser);
+		}
+		if (setting->ETA == 1 && BETA_UPDATE == 1 )
+		{
+			opt_alpha(eta, eta_ss,
+				num_topics,
+				size_vocab,
+				setting); // means some words are a priori more likely than others for each topic across whole document
+			std::cout << "New eta: ";
+			for (w = 0; w < size_vocab; w++)
+				std::cout << eta[w] << ", ";
+			std::cout << std::endl;
+			delete[] eta_ss;
+		}
+	}
+	else
+	{
+		for (k = 0; k < num_topics; k++)
+		{
+			for (w = 0; w < size_vocab; w++)
+			{
+				if (ss->word_ss[k][w] > 0)
+					log_prob_w[k][w] = log(ss->word_ss[k][w]) - log(ss->word_total_ss[k]);
+				else
+					log_prob_w[k][w] = -800.0;
+				ddelta[k][w] = log_prob_w[k][w]; // Avoids having to switch between logprobword and delta with prior in estimation
+			}
+		}
+	}
 
 	if (BETA_UPDATE == 0) return 0;
 
@@ -1090,19 +971,9 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			std::cout << alpha[k] << ", ";
 		std::cout << std::endl;
 	}
-	if (setting->ETA == 1)
-	{
-			opt_alpha(eta, eta_ss,
-				num_topics,
-				size_vocab,
-			setting); // means some words are a priori more likely than others for each topic across whole document
-			std::cout << "New eta: ";
-			for (w = 0; w < size_vocab; w++)
-				std::cout << eta[w] << ", ";
-			std::cout << std::endl;
-	}
 
-	delete[] eta_ss;
+
+
 
 	const int nt = num_topics + covariatesN  - 1; //Important to drop a topic from MLE to ensure a baseline group (otherwise cox model estimates can drift excessively)
 	lambda = pow(10, setting->LAMBDASTART);
@@ -1148,7 +1019,7 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			cvbeta[i][k] = topic_beta[k - covariatesN];
 
 	}
-	//omp_set_num_threads(1);	
+
 #pragma omp parallel  default(none) shared(cvbeta, ss, setting, fsum, var)
 	{
 		
@@ -1164,15 +1035,6 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 				- floor(static_cast<double>(ii) / static_cast<double>(setting->CROSSVAL))))
 				, ss, setting
 				);
-			//fsum[ii] = cox_net_cross_val(
-			//	0.0,
-			//	ii % setting->CROSSVAL,
-			//	newbeta, var, zbeta, step, nt,
-			//	pow(10.0, (static_cast<double>(setting->LAMBDAEND)
-			//	- floor(static_cast<double>(ii) / static_cast<double>(setting->CROSSVAL))))
-			//	, ss, setting
-			//	);
-			//	printf(" %d %f \n", ii, fsum[ii]);
 		}
 	}
 
@@ -1206,74 +1068,7 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 	delete[] cvbeta;
 	cvbeta = nullptr;
 
-	///****************** Cross val for alpha net *************/
-	/*
-	for (i = 0; i < lambdarange * setting->CROSSVAL; i++)
-	fsum[i] = 0.0;
-
-
-	//omp_set_num_threads(1);
-	#pragma omp parallel  default(none) shared( ss, setting, fsum, var)
-	{
-	double * zbeta = new double[ss->num_docs];
-	for (int dd = 0; dd < ss->num_docs; dd++)
-	zbeta[dd] = 0.0;
-
-	double * newbeta = new double[nt];
-	for (int kk = 0; kk < covariatesN; kk++)
-	newbeta[kk] = cov_beta[kk];
-
-	for (int kk = covariatesN; kk < nt; kk++)
-	newbeta[kk] = topic_beta[kk - covariatesN]; //log scale so dividing by the smallest beta.
-
-
-	double * step = new double[nt];
-	for (int kk = 0; kk < nt; kk++)
-	step[kk] = 1.0;
-
-	int size = omp_get_num_threads(); // get total number of processes
-	int rank = omp_get_thread_num(); // get rank of current
-	for (int ii = (rank * lambdarange * setting->CROSSVAL / size); ii < ((rank + 1) * lambdarange * setting->CROSSVAL / size); ii++)
-	{
-	double temp_alphanet =
-	floor(static_cast<double>(ii) / static_cast<double>(setting->CROSSVAL))
-	/ static_cast<double>(lambdarange);
-	fsum[ii] = cox_net_cross_val(
-	temp_alphanet,
-	ii % setting->CROSSVAL,
-	newbeta, var, zbeta, step, nt,
-	lambda, ss, setting
-	);
-	//		printf(" %d %f \n", ii,temp_alphanet);
-	}
-
-	delete[] zbeta;
-	zbeta = nullptr;
-	delete[] newbeta;
-	newbeta = nullptr;
-	delete[] step;
-	step = nullptr;
-	}
-
-
-	cv = numeric_limits<double>::lowest();
-	double alphanet = 1.0;
-	for (i = 0; i < lambdarange; i++)
-	{
-	for (j = 1; j < setting->CROSSVAL; j++)
-	fsum[i * setting->CROSSVAL] += fsum[(i * setting->CROSSVAL) + j];
-	//		cout.precision(15);
-	//		std::cout << "fsum " << i * setting->CROSSVAL << ": " << std::fixed << fsum[i * setting->CROSSVAL] <<std::endl;
-	if (fsum[i * setting->CROSSVAL] >(cv + setting->MAX_EPS))
-	{
-	cv = fsum[i * setting->CROSSVAL];
-	alphanet = static_cast<double>(i) / static_cast<double>(lambdarange);
-	}
-	//		cout.precision(6);
-	}
-	std::cout << " Selected alpha net = " << alphanet << ", ";
-	*/
-
+	
 
 	/////////////////
 	double * zbeta = new double[ss->num_docs];
@@ -1281,10 +1076,10 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 		zbeta[d] = 0.0;
 
 	int miter = 0;
-	//miter = coxfit(newbeta, nt, var, zbeta, ss, &f, setting);
+
 
 	miter = cox_reg(newbeta, zbeta, var, nt, lambda, ss, &f, setting);
-	//miter = cox_net(alphanet, newbeta, zbeta, var, nt, lambda, ss, &f, setting);
+
 	std::cout << " M iter = " << miter << ", f = " << f << std::endl;
 	while (isn(f))
 	{
@@ -1344,7 +1139,7 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			exb = log_sum(exb, exb2);
 		
 		//std::cout << " = " << exb << std::endl << " xb " << xb << " xb2 " << xb2;
-		//   log(exp(xb)+exp(xb2))
+
 		//std::cout << " = " << xb << std::endl;
 		if ((d == 0 || ss->times[d] != ss->times[d - 1]) )
 		{
@@ -1380,20 +1175,6 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 
 	delete[] newbeta;
 	newbeta = nullptr;
-
-
-	//if (isn(basehaz[0]) || basehaz[0] < 5e-324)
-	//	basehaz[0] = 5e-324; //log(basehaz) required so a minimum measureable hazard is required to avoid NaN errors.
-	//if (isn(basehaz[event_times - 1]) || basehaz[event_times - 1] < 5e-324)
-	//	basehaz[event_times - 1] = basehaz[event_times - 2]; //log(basehaz) required so a minimum measureable hazard is required to avoid NaN errors.
-	//for (int r = 1; r < event_times - 1; r++)
-	//{
-	//	if (isn(basehaz[r]) || basehaz[r] <= 0)
-	//	{
-	//		basehaz[r] = (basehaz[r - 1] + basehaz[r + 1]) / 2; //log(basehaz) required so a minimum measureable hazard is required to avoid NaN errors.
-	//		std::cout << " interpolating baseline hazard" << std::endl;
-	//	}
-	//}
 
 	double num = 0.0, den = 0.0;
 
@@ -1556,82 +1337,14 @@ double sslda::coxonly(const corpus * c ,  const settings * setting)
 	double * newbeta = new double[size_vocab];
 	for (k = 0; k < size_vocab; k++)
 		newbeta[k] = 0.0;
-	/*double ** cvbeta = new double *[lambdarange * setting->CROSSVAL];
-	for (i = 0; i < lambdarange * setting->CROSSVAL; i++)
-	{
-		cvbeta[i] = new double[covariatesN + size_vocab];
-		for (k = 0; k < covariatesN; k++)
-			cvbeta[i][k] = cov_beta[k];
-
-		for (v = covariatesN; v < covariatesN + size_vocab; v++)
-			cvbeta[i][k] = topic_beta[v-covariatesN];
-
-	}
-	//omp_set_num_threads(1);	
-#pragma omp parallel  default(none) shared(cvbeta, ss, setting, fsum, var)
-	{
-
-
-		int size = omp_get_num_threads(); // get total number of processes
-		int rank = omp_get_thread_num(); // get rank of current ( range 0 -> (num_threads - 1) )
-		for (int ii = (rank * lambdarange * setting->CROSSVAL / size); ii < ((rank + 1) * lambdarange * setting->CROSSVAL / size); ii++)
-		{
-			fsum[ii] = cox_reg_cross_val(
-				ii % setting->CROSSVAL,
-				cvbeta[ii], var, covariatesN + size_vocab,
-				pow(10.0, (static_cast<double>(setting->LAMBDAEND)
-				- floor(static_cast<double>(ii) / static_cast<double>(setting->CROSSVAL))))
-				, ss, setting
-				);
-			//fsum[ii] = cox_net_cross_val(
-			//	0.0,
-			//	ii % setting->CROSSVAL,
-			//	newbeta, var, zbeta, step, nt,
-			//	pow(10.0, (static_cast<double>(setting->LAMBDAEND)
-			//	- floor(static_cast<double>(ii) / static_cast<double>(setting->CROSSVAL))))
-			//	, ss, setting
-			//	);
-			//	printf(" %d %f \n", ii, fsum[ii]);
-		}
-	}
-
 	
-	double cv = numeric_limits<double>::lowest();
-
-	for (i = 0; i < lambdarange; i++)
-	{
-		for (j = 1; j < setting->CROSSVAL; j++)
-		{
-			fsum[i * setting->CROSSVAL] += fsum[(i * setting->CROSSVAL) + j];
-			for (k = 0; k < covariatesN + size_vocab; k++)
-				cvbeta[i * setting->CROSSVAL][k] += cvbeta[(i * setting->CROSSVAL) + j][k];
-		}
-		//	cout.precision(15);
-		//	std::cout << "fsum " << i * setting->CROSSVAL << ": " << std::fixed << fsum[i * setting->CROSSVAL] <<std::endl;
-		if (fsum[i * setting->CROSSVAL] >(cv + setting->MAX_EPS))
-		{
-			cv = fsum[i * setting->CROSSVAL];
-			lambda = pow(10.0, (static_cast<double>(setting->LAMBDAEND) - static_cast<double>(i)));
-			for (k = 0; k < covariatesN + size_vocab; k++)
-				newbeta[k] = cvbeta[i * setting->CROSSVAL][k] / static_cast<double>(setting->CROSSVAL);
-
-		}
-		//cout.precision(6);
-	}
-	std::cout << " Selected Lambda = " << lambda << ", ";
-	for (i = 0; i < lambdarange * setting->CROSSVAL; i++)
-		delete[] cvbeta[i];
-	delete[] cvbeta;
-	cvbeta = nullptr;
-	*/
 	double * zbeta = new double[ss->num_docs];
 	for (d = 0; d < ss->num_docs; d++)
 		zbeta[d] = 0.0;
 
 	int miter = 0;
 	miter = cox_reg_sparse(newbeta, zbeta, c, size_vocab, lambda, ss, &f, setting);
-	//miter = cox_net(alphanet, newbeta, zbeta, var, nt, lambda, ss, &f, setting);
-	//miter = coxfit(newbeta, covariatesN, var, zbeta, ss, &f, setting);
+
 	while (isn(f))
 	{
 		lambda /= 10.0;
@@ -1639,11 +1352,7 @@ double sslda::coxonly(const corpus * c ,  const settings * setting)
 			newbeta[k] = 0.0;
 		std::cout << std::endl << "Proportional hazards model failed to converge. Setting lambda to " << lambda << std::endl;
 		miter = cox_reg_sparse(newbeta, zbeta, c, size_vocab, lambda, ss, &f, setting);
-		/*std::cout << "Coefficients : ";
-		for (k = 0; k < nt; k++)
-		std::cout << newbeta[k] << ", ";
-		std::cout << std::endl;*/
-		//return -4;
+
 	}
 
 
@@ -1694,19 +1403,6 @@ double sslda::coxonly(const corpus * c ,  const settings * setting)
 	newbeta = nullptr;
 
 
-	//if (isn(basehaz[0]) || basehaz[0] < 5e-324)
-	//	basehaz[0] = 5e-324; //log(basehaz) required so a minimum measureable hazard is required to avoid NaN errors.
-	//if (isn(basehaz[event_times - 1]) || basehaz[event_times - 1] < 5e-324)
-	//	basehaz[event_times - 1] = basehaz[event_times - 2]; //log(basehaz) required so a minimum measureable hazard is required to avoid NaN errors.
-	//for (int r = 1; r < event_times - 1; r++)
-	//{
-	//	if (isn(basehaz[r]) || basehaz[r] <= 0)
-	//	{
-	//		basehaz[r] = (basehaz[r - 1] + basehaz[r + 1]) / 2; //log(basehaz) required so a minimum measureable hazard is required to avoid NaN errors.
-	//		std::cout << " interpolating baseline hazard" << std::endl;
-	//	}
-	//}
-
 	double num = 0.0, den = 0.0;
 
 	int * mark = new int[ss->num_docs];
@@ -1716,7 +1412,7 @@ double sslda::coxonly(const corpus * c ,  const settings * setting)
 	mark[ss->num_docs - 1] = 1;
 	for (d = ss->num_docs - 2; d >= 0; d--)
 	{
-		if (ss->times[d] == ss->times[d + 1]) //assume sorted by time, so calculate the number needed to jump to next increment in time
+		if (ss->times[d] == ss->times[d + 1]) // sorted by time, so calculate the number needed to jump to next increment in time
 			count++;
 		else
 			count = 1;
@@ -1756,8 +1452,6 @@ double sslda::coxonly(const corpus * c ,  const settings * setting)
 }
 
 
-
-
 double sslda::doc_e_step(document* doc, int docN,  double* gamma, double** phi, double* oldphi, double* dig, double* cbhz_params, suffstats * ss, int BETA_UPDATE,  const double var_converged, const int var_max_iter)
 {
 	int n, k;
@@ -1770,10 +1464,7 @@ double sslda::doc_e_step(document* doc, int docN,  double* gamma, double** phi, 
 	if (isn(likelihood))
 		return likelihood;
 
-
-   
-
-    // update sufficient statistics (zero initialised in v_em)
+	   // update sufficient statistics (zero initialised in v_em)
 
 	
     for (n = 0; n < doc->length; n++)
@@ -1871,11 +1562,7 @@ double sslda::lda_compute_likelihood(document* doc, double** phi, double* var_ga
 
     likelihood = boost::math::lgamma(alpha_sum) - boost::math::lgamma(var_gamma_sum); // A5 and A8
 
-	// boost::math::lgamma(alpha_sum) - sum(boost::math::lgamma(alpha)) + (alpha - 1.0)*(dig[k] - digsum) ------E(theta|dir(alpha))
-	// doc->counts[n] * phi[n][k] * (dig[k] - digsum) ----E(word allocation | theta)
-	// doc->counts[n] * phi[n][k] * log_prob_w[k][doc->words[n]] -----E(word | theta and word allocation) 
-	// - boost::math::lgamma(var_gamma_sum) + sum(boost::math::lgamma(var_gamma[k]) - (var_gamma[k] - 1.0)*(dig[k] - digsum)) --- entropy of theta variational parameters
-	// phi[n][k] * log(phi[n][k])--- entropy of variational word allocation parameter
+
     for (k = 0; k < num_topics; k++)
     {
         likelihood += - boost::math::lgamma(alpha[k]) + (alpha[k] - 1.0)*(dig[k] - digsum) +
@@ -1982,7 +1669,7 @@ double sslda::sslda_inference(document* doc, double* var_gamma, double** phi, do
         likelihood_old = likelihood;
 		//std::cout << "likelihood = "<< likelihood << std::endl;
 	}
-	//if (var_iter == var_max_iter) return NAN;
+
     return likelihood;
 }
 
@@ -2011,7 +1698,7 @@ double sslda::sslda_compute_likelihood(document* doc, double** phi, double* var_
 		{
 			if (phi[n][k] > 0.0)
 			{
-				likelihood += doc->counts[n] * (phi[n][k] * ((dig[k] - digsum) - log(phi[n][k]) + log_prob_w[k][doc->words[n]]));
+				likelihood += doc->counts[n] * (phi[n][k] * ((dig[k] - digsum) - log(phi[n][k]) + ddelta[k][doc->words[n]]));
 				if (doc->label > 0)
 					temp += topic_beta[k] * doc->counts[n] * phi[n][k];
 			}
@@ -2046,8 +1733,7 @@ double sslda::sslda_compute_likelihood(document* doc, double** phi, double* var_
 
 double sslda::infer_only(const corpus * c, const settings * setting, double *perplexity, double *loglik ,  const char * directory, int save)
 {
-	//suffstats * ss = new_suffstats(c->num_docs);
-	//random_initialize_ss(ss, c, setting);
+
 	int d, k;
 	double lik = 0.0; 
 	double ** var_gamma = new double *[c->num_docs];
@@ -2064,7 +1750,7 @@ double sslda::infer_only(const corpus * c, const settings * setting, double *per
     {
 		ddelta[k] = new double[size_vocab];
 		for (int w = 0; w < size_vocab; w++)
-			ddelta[k][w] = log_prob_w[k][w];
+			ddelta[k][w] = log_prob_w[k][w]; // no maximisation step in inference so leave as log prob estimated from initial model.
 
 	}
 
@@ -2292,37 +1978,5 @@ void sslda::save_zbar(const char* filename, double ** z_bar, int num_docs)
 		std::cerr << "unable to open " << filename << std::endl;
 }
 
-void sslda::save_expected_combined_prob(double ** Expectedcombprob)
-{
-//	double baseprob = log(1 / size_vocab); // By only considering terms that occur more than expected for a topic the computation time is reduced.
 
-
-	double * maxprob = new double[size_vocab];
-	for (int v = 0; v < size_vocab; v++)
-		for (int k = 0; k < num_topics; k++)
-			if (k==0 || maxprob[v] < log_prob_w[k][v])
-				maxprob[v] = log_prob_w[k][v];
-
-
-
-
-	for (int k = 0; k < num_topics; k++)
-	{
-#pragma omp parallel default(none) shared(Expectedcombprob, maxprob, k)
-		{
-			int size = omp_get_num_threads(); // get total number of processes
-			int rank = omp_get_thread_num(); // get rank of current
-
-			for (int v1 = (rank*size_vocab / size); v1 < (rank + 1)*size_vocab / size; v1++)
-				if (log_prob_w[k][v1] == maxprob[v1])
-					for (int v2 = v1 + 1; v2 < size_vocab; v2++)
-						if (log_prob_w[k][v2] ==maxprob[v2])
-							Expectedcombprob[v1][v2] +=
-								exp(log_prob_w[k][v1] + log_prob_w[k][v2] + topic_logprob[k]); 
-			// prob(v1, v2 |  k) * prob(k) - assumes v1, v2 independent given topic
-		}
-	}
-	delete[] maxprob;
-	maxprob = nullptr;
-}
 

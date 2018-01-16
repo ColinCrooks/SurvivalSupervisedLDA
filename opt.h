@@ -1,12 +1,12 @@
-// Latent Dirichlet Allocation supervised by penalised Cox proportional hazards modelling with optional learning of asymmetrical priors.
+// (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei
 
-//This has been developed from the original code (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei ([1] Blei DM, McAuliffe JD. Supervised Topic Models. Adv Neural Inf Process Syst 20 2007:121–8.) and modified following the algorithms developed by Ye et al. 2014 ([1] Ye S, Dawson JA, Kendziorski C. Extending information retrieval methods to personalized genomic-based studies of disease. Cancer Inform 2014;13:85–95. doi:10.4137/CIN.S16354.)
+// written by Chong Wang, chongw@cs.princeton.edu
 
-// Modifications by Colin Crooks (colin.crooks@nottingham.ac.uk)
+// This file is part ofsslda.
 
 //sslda is free software; you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free
-// Software Foundation; either version 3 of the License, or (at your
+// Software Foundation; either version 2 of the License, or (at your
 // option) any later version.
 
 //sslda is distributed in the hope that it will be useful, but WITHOUT
@@ -69,66 +69,6 @@ int cox_reg_sparse(
 	double * f,
 	const settings* setting);
 
-
-int cox_lasso(
-	double * beta,
-	double * zbeta,
-	double ** var, int nvar,
-	double lambda,
-	suffstats * ss,
-	double * f,
-	const settings* setting
-	);
-
-double cox_lasso_cross_val(
-	int group,
-	double * newbeta,
-	double ** var,
-	double * zbeta,
-	double * step,
-	int nvar,
-	double lambda,
-	const suffstats * ss,
-	const settings* setting
-	);
-
-int cox_net(
-	double alphanet, 
-	double * beta, 
-	double * zbeta, 
-	double ** var, 
-	int nvar, 
-	double lambda,
-	suffstats * ss,
-	double * f,
-	const settings* setting
-	);
-
-double cox_net_cross_val(
-	double alphanet,
-	int group,
-	double * newbeta,
-	double ** var,
-	double * zbeta,
-	double * step,
-	int nvar,
-	double lambda,
-	const suffstats * ss,
-	const settings* setting
-	);
-
-int coxfit(double * beta, int nvar,
-	double ** var,
-	double * zbeta,
-	const suffstats * ss, double * f, const settings* setting);
-
-
-
-//double beta_f(const gsl_vector * x, void * opt_param);
-//
-//void beta_df(const gsl_vector * x, void * opt_param, gsl_vector * df);
-//
-//void  beta_ddf(const gsl_vector * x, void * opt_param, double * f, gsl_vector * df);
 
 
 #endif // OPT_H_INCLUDED
