@@ -84,7 +84,7 @@ public:
 
 
 public:
-    double*  alpha; // the parameter for the per document topic dirichlet
+    double*  alpha; // the parameter for the per corpus topic dirichlet
 	double* eta; //  the paramenter for the per topic word dirichlet
 	double lambda;  // L2 penalty for Cox regression
     int num_topics; // number of topics selected by user or from range command
@@ -99,9 +99,8 @@ public:
 	double * cumbasehaz = nullptr; // cummulative baseline hazard
 	double *topic_beta = nullptr; //beta for the latent topic hazard ratios
 	double * cov_beta = nullptr; // beta for the additional covariates adjusted for
-	double ** log_prob_w = nullptr; //Per Term topic probability the log of the topic distribution	
-	double ** delta = nullptr; // posterior for the word topic dirichlet 
-	double ** ddelta = nullptr; // expectation of the word topic dirichlet
+	double ** delta = nullptr; // parameter for the topic word dirichlet 
+	double ** ddelta = nullptr; // expectation of the topic word dirichlet
 	double  ldelta; // log likelihood component from the word topic dirichlet 
 };
 
