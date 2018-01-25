@@ -48,7 +48,6 @@ sslda::sslda()
 	events = nullptr;
 	basehaz = nullptr; 
 	cumbasehaz = nullptr;
-    log_prob_w = nullptr;
 	delta = nullptr;
 	ddelta = nullptr;
 	ldelta = 0.0;
@@ -80,19 +79,17 @@ void sslda::init(double alpha_, int num_topics_,
 	covariatesN = covariatesN_;
     event_times = c->event_times;
 	time_start = c->time_start;
-    log_prob_w = new double * [num_topics];
+
 	delta = new double *[num_topics];
 	ddelta = new double* [num_topics];
 	ldelta = 0.0;
     for (int k = 0; k < num_topics; k++)
     {
-        log_prob_w[k] = new double [size_vocab];
 		delta[k] = new double[size_vocab];
 		ddelta[k] = new double[size_vocab];
 
 		for (int w = 0; w < size_vocab; w++)
 		{
-			log_prob_w[k][w] = 0.0;
 			delta[k][w] = 0.0;
 			ddelta[k][w] = 0.0;
 
@@ -136,14 +133,6 @@ void sslda::free_model()
 		delete[] basehaz;
 		basehaz = nullptr;
 	}
-    if (log_prob_w != nullptr)
-    {
-        for (int k = 0; k < num_topics; k++)
-            delete [] log_prob_w[k];
-
-        delete [] log_prob_w;
-        log_prob_w = nullptr;
-    }
 	if (delta != nullptr)
 	{
 		for (int k = 0; k < num_topics; k++)
@@ -188,7 +177,7 @@ int sslda::save_model(const char * filename)
 		file.write(reinterpret_cast<char*>(&event_times), sizeof (int));
 		file.write(reinterpret_cast<char*>(&lambda), sizeof (double));
 		for (int k = 0; k < num_topics; k++)
-			file.write(reinterpret_cast<char*>(&log_prob_w[k][0]), sizeof(double)* size_vocab);
+			file.write(reinterpret_cast<char*>(&ddelta[k][0]), sizeof(double)* size_vocab);
 		file.write(reinterpret_cast<char*>(&topic_beta[0]), sizeof(double)* num_topics);
 		if (cov_beta != nullptr)
 			file.write(reinterpret_cast<char*>(&cov_beta[0]), sizeof(double)* covariatesN);
@@ -216,11 +205,11 @@ int sslda::load_model(const char * filename)
 		file.read(reinterpret_cast<char*>(&event_times), sizeof (int));
 		file.read(reinterpret_cast<char*>(&lambda), sizeof (double));
 
-		log_prob_w = new double *[num_topics];
+		ddelta = new double *[num_topics];
 		for (int k = 0; k < num_topics; k++)
 		{
-			log_prob_w[k] = new double[size_vocab];
-			file.read(reinterpret_cast<char*>(&log_prob_w[k][0]), sizeof(double)* size_vocab);
+			ddelta[k] = new double[size_vocab];
+			file.read(reinterpret_cast<char*>(&ddelta[k][0]), sizeof(double)* size_vocab);
 		}
 
 		topic_beta = new double[num_topics];
@@ -261,7 +250,7 @@ int sslda::save_model_text(const char * filename)
 		for (int j = 0; j < size_vocab; j++)
 		{
 			for (int k = 0; k < num_topics; k++)
-				file << log_prob_w[k][j] << " ";
+				file << ddelta[k][j] << " ";
 			file << std::endl;
 		}
 		if (cov_beta != nullptr)
@@ -905,10 +894,12 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			eta_sum += eta[w];
 			eta_ss[w] = 0;
 		}
-		ldelta = boost::math::lgamma(eta_sum);
+		
+
+		ldelta = num_topics*boost::math::lgamma(eta_sum);
 		for (w = 0; w < size_vocab; w++)
 		{
-			ldelta -= boost::math::lgamma(eta[w]);
+			ldelta -= num_topics*boost::math::lgamma(eta[w]);
 		}
 
 		for (k = 0; k < num_topics; k++)
@@ -916,19 +907,15 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			double normaliser = 0.0;
 			for (w = 0; w < size_vocab; w++)
 			{
-				delta[k][w] = eta[k] + ss->word_ss[k][w];
+				delta[k][w] = eta[w] + ss->word_ss[k][w];
 				ddelta[k][w] = boost::math::digamma(delta[k][w]) - boost::math::digamma(eta_sum + ss->word_total_ss[k]);
-				ldelta += ((eta[w] - 1.0) * ddelta[k][w])
-					+ boost::math::lgamma(delta[k][w])
-					- ((delta[k][w] - 1.0) *ddelta[k][w]);
+				ldelta += ((eta[w] - 1.0) * boost::math::digamma(delta[k][w]);
 				if (ddelta[k][w] < -800)
 					ddelta[k][w] = -800;
 				normaliser += delta[k][w];
 				eta_ss[w] += ddelta[k][w];
 			}
-			ldelta -= boost::math::lgamma(normaliser);
-			for (w = 0; w < size_vocab; w++)
-				log_prob_w[k][w] = log(delta[k][w]) - log(normaliser);
+			ldelta -= (eta[w] - 1.0) *boost::math::digamma(normaliser);
 		}
 		if (setting->ETA == 1 && BETA_UPDATE == 1 )
 		{
@@ -942,6 +929,8 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			std::cout << std::endl;
 			delete[] eta_ss;
 		}
+
+	
 	}
 	else
 	{
@@ -950,10 +939,9 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			for (w = 0; w < size_vocab; w++)
 			{
 				if (ss->word_ss[k][w] > 0)
-					log_prob_w[k][w] = log(ss->word_ss[k][w]) - log(ss->word_total_ss[k]);
+					ddelta[k][w] = log(ss->word_ss[k][w]) - log(ss->word_total_ss[k]);
 				else
-					log_prob_w[k][w] = -800.0;
-				ddelta[k][w] = log_prob_w[k][w]; // Avoids having to switch between logprobword and delta with prior in estimation
+					ddelta[k][w] = -800.0;
 			}
 		}
 	}
@@ -1743,15 +1731,6 @@ double sslda::infer_only(const corpus * c, const settings * setting, double *per
 		var_gamma[d] = new double[num_topics];
 		for (k = 0; k < num_topics; k++)
 			var_gamma[d][k] = 0.0;
-	}
-
-	ddelta = new double * [num_topics];
-	for (k = 0; k < num_topics; k++)
-    {
-		ddelta[k] = new double[size_vocab];
-		for (int w = 0; w < size_vocab; w++)
-			ddelta[k][w] = log_prob_w[k][w]; // no maximisation step in inference so leave as log prob estimated from initial model.
-
 	}
 
 
