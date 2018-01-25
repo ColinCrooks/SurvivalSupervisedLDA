@@ -909,7 +909,7 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			{
 				delta[k][w] = eta[w] + ss->word_ss[k][w];
 				ddelta[k][w] = boost::math::digamma(delta[k][w]) - boost::math::digamma(eta_sum + ss->word_total_ss[k]);
-				ldelta += ((eta[w] - 1.0) * boost::math::digamma(delta[k][w]);
+				ldelta += (eta[w] - 1.0) * boost::math::digamma(delta[k][w]);
 				if (ddelta[k][w] < -800)
 					ddelta[k][w] = -800;
 				normaliser += delta[k][w];
