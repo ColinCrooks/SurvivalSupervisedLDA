@@ -1,12 +1,14 @@
-// (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei
+// Latent Dirichlet Allocation supervised by penalised Cox proportional hazards modelling with optional learning of asymmetrical priors.
 
-// written by Chong Wang, chongw@cs.princeton.edu
+//This has been modified from the original code (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei ([1] Blei DM, McAuliffe JD. Supervised Topic Models. Adv Neural Inf Process Syst 20 2007:121–8.) and modified following the algorithms developed by Ye et al. 2014 ([1] Ye S, Dawson JA, Kendziorski C. Extending information retrieval methods to personalized genomic-based studies of disease. Cancer Inform 2014;13:85–95. doi:10.4137/CIN.S16354.)
 
-// This file is part ofsslda.
+// Modifications by  (C) Copyright 2017 Colin Crooks (colin.crooks@nottingham.ac.uk)
+
+// This file is part of sslda.
 
 //sslda is free software; you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free
-// Software Foundation; either version 2 of the License, or (at your
+// Software Foundation; either version 3 of the License, or (at your
 // option) any later version.
 
 //sslda is distributed in the hope that it will be useful, but WITHOUT
@@ -18,8 +20,6 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 // USA
-
-//survLDA est code_wide settings 0.3 100 seeded results >& log.txt
 
 //MSVS debugging
 # if defined(_MSC_VER)
@@ -35,7 +35,8 @@
 # include <sys/stat.h> // linux header for mkdir
 #endif
 
-
+#include <boost/random.hpp>
+#include <boost/random/uniform_01.hpp>
 
 #include <cstddef> //NULL
 #include <iostream>
@@ -47,7 +48,8 @@
 
 void help( void ) {
     std::cout <<"Usage: survlda [est] [settings] [data] [adj] [alpha] [k]  [random/seeded/model_path] [directory]" << std::endl;
-	std::cout << "Usage: survlda [cox] [settings] [data] [adj] [directory]" << std::endl;
+	std::cout << "survlda [bootstrap] [settings] [data] [adj] [alpha] [k] [iterations]  [random/seeded/model_path] [directory]" << std::endl;
+	std::cout << " survlda [cox] [settings] [data] [adj] [directory]" << std::endl;
 	std::cout << "       survlda [inf] [settings] [data] [adj] [model] [directory]" << std::endl;
 	std::cout << "	   survlda [range] [settings] [data] [adj] [val data] [val adj] " << std::endl;
 	std::cout << "				 [k min] [k max] [k step]  [random/seeded/model_path] [directory]" << std::endl;
@@ -96,22 +98,136 @@ int main(int argc, char* argv[])
 
 		sslda model;
 		model.init(alpha, num_topics, setting.ADJN, &c);
-	//	corpus c_val;
-	//	string valdata_filename = argv[8 + a];
-	//	if (c_val.read_data(valdata_filename.c_str(), &setting) != 1)
-	//		return -1;
-	//	if (setting.ADJN > 0)
-	//	{
-	//		string adjval_filename = argv[9+a];
-	//		if (c_val.read_adj(adjval_filename.c_str(), &setting) != 1)
-	//			return -1;
-	//		a ++;
-	//	}
 
 		int test = model.v_em(&c, &setting, init_method.c_str(), directory.c_str() );
 		if(test !=1)
 			std::cerr << "Model returned " << test << std::endl;
+		model.free();
+		c.free();
     }
+	if (strcmp(argv[1], "bootstrap") == 0)
+	{
+		settings setting;
+		string setting_filename = argv[2];
+		if (setting.read_settings(setting_filename.c_str()) != 1)
+			return -1;
+
+		corpus c;
+		string data_filename = argv[3];
+		if (c.read_data(data_filename.c_str(), &setting) != 1)
+			return -1;
+		int a = 0;
+		if (setting.ADJN > 0)
+		{
+			string adj_filename = argv[4];
+			if (c.read_adj(adj_filename.c_str(), &setting) != 1)
+				return -1;
+			a = 1;
+		}
+
+		double  alpha = atof(argv[4 + a]);
+		int num_topics = atoi(argv[5 + a]);
+		int iterations = atoi(argv[6 + a]);
+		std::cout << "number of topics:  " << num_topics << std::endl;
+		string init_method = argv[7 + a];
+		string directory = argv[8 + a];
+		std::cout << "models will be saved in " << directory << std::endl;
+		int check = mkd(directory.c_str());
+		if (check != 0 && errno != EEXIST)
+		{
+			std::cerr << "Unable to make " << directory.c_str() << " " << check << std::endl;
+			return -1;
+		}
+		
+		double * cstat = new double[iterations];
+		double * perplexity = new double[iterations];
+		double * loglik = new double[iterations];
+		for (int i = 0; i < iterations; i++)
+		{
+			cstat[i] = 0.0;
+			perplexity[i] = 0.0;
+			loglik[i] = 0.0;
+		}
+		for (int i = 0; i < iterations; i++)
+		{
+			string iterdirectory = directory + "\\Iteration" + std::to_string(i);
+			int check2 = mkd(iterdirectory.c_str());
+			if (check2 != 0 && errno != EEXIST)
+			{
+				std::cerr << "Unable to make " << iterdirectory.c_str() << " " << check2 << std::endl;
+				return -1;
+			}
+			
+			corpus s;
+			corpus s_val;
+			c.sample(&s, &s_val, &setting);
+			std::cout << s.num_docs << " documents in sample for training in iteration " << i << " out of " << iterations << " iterations" << std::endl;
+			std::cout << s_val.num_docs << " documents in sample for testing in iteration " << i  << " out of " << iterations << " iterations" << std::endl;
+			sslda model;
+			model.init(alpha, num_topics, setting.ADJN, &s);
+
+			int test = model.v_em(&s, &setting, init_method.c_str(), iterdirectory.c_str());
+			if (test != 1)
+				std::cerr << "Model returned " << test << std::endl;
+			model.free_model();
+			s.free();
+			stringstream val_model_filename;
+			val_model_filename << iterdirectory.c_str() << "\\final.model";
+			sslda model_val;
+			model_val.load_model(val_model_filename.str().c_str());
+			std::cout << val_model_filename.str() << " reloaded for validation " << std::endl;
+			cstat[i] = model_val.infer_only(&s_val, &setting, &perplexity[i], &loglik[i], iterdirectory.c_str(), 0);
+			model_val.free_model();
+			s_val.free();
+		}
+
+
+		std::cout << " ...results in file " ;
+		stringstream filename_r;
+		filename_r << directory << "\\results.csv";
+		ofstream rfile(filename_r.str().c_str());
+		if (!rfile.is_open())
+		{
+			std::cout << "Unable to create results file, printing to screen only\n" << std::endl;
+			std::cout << std::endl << std::endl << "C statistics : " << std::endl;
+			for (int i = 0; i < iterations; i++)
+				std::cout << cstat[i] << ", ";
+			std::cout << std::endl;
+
+			std::cout << std::endl << std::endl << "Perplexity : " << std::endl;
+			for (int i = 0; i < iterations; i++)
+				std::cout << perplexity[i] << ", ";
+			std::cout << std::endl;
+
+
+			std::cout << std::endl << std::endl << "Log likelihood : " << std::endl;
+			for (int i = 0; i < iterations; i++)
+				std::cout << loglik[i] << ", ";
+			std::cout << std::endl;
+
+			delete[] loglik;
+			delete[] perplexity;
+			delete[] cstat;
+			loglik = nullptr;
+			perplexity = nullptr;
+			cstat = nullptr;
+			return 0;
+
+		}
+		rfile << "C statistic , Perplexity, Log likelihood " << std::endl;;
+		for (int i = 0; i < iterations; i++)
+		{
+			rfile << cstat[i] << ", " << perplexity[i] << "," << loglik[i] << std::endl;
+		}
+
+		rfile.close();
+		delete[] cstat;
+		delete[] perplexity;
+		delete[] loglik;
+		cstat = nullptr;
+		perplexity = nullptr;
+		loglik = nullptr;
+	}
 	if (strcmp(argv[1], "cox") == 0)
 	{
 		settings setting;
@@ -145,6 +261,8 @@ int main(int argc, char* argv[])
 		double test = model.coxonly(&c, &setting);
 		if (test != 1)
 			std::cerr << "Model returned " << test << std::endl;
+		model.free();
+		c.free();
 	}
     else if (strcmp(argv[1], "inf") == 0)
     {
@@ -183,6 +301,8 @@ int main(int argc, char* argv[])
 		double Cstat = model.infer_only(&c, &setting, &perplexity, &loglik , directory.c_str() ,1 );
 		if (isn(Cstat))
 			std::cerr << "Error in calculating C statistic" << std::endl;
+		model.free();
+		c.free();
 	 }
 	else if (strcmp(argv[1], "range") == 0)
 	{
@@ -272,6 +392,7 @@ int main(int argc, char* argv[])
 			}
 			
 		}
+		c.free();
 
 		std::cout << " ...results file file" << std::endl;
 		stringstream filename_r;
@@ -318,9 +439,9 @@ int main(int argc, char* argv[])
 		delete[] cstat;
 		delete[] perplexity;
 		delete[] loglik;
-		cstat = NULL;
-		perplexity = NULL;
-		loglik = NULL;
+		cstat = nullptr;
+		perplexity = nullptr;
+		loglik = nullptr;
 	}
 
 }

@@ -1,23 +1,26 @@
-// (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei
+// Latent Dirichlet Allocation supervised by penalised Cox proportional hazards modelling with optional learning of asymmetrical priors.
 
-// written by Chong Wang, chongw@cs.princeton.edu
+//This has been modified from the original code (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei ([1] Blei DM, McAuliffe JD. Supervised Topic Models. Adv Neural Inf Process Syst 20 2007:121–8.) and modified following the algorithms developed by Ye et al. 2014 ([1] Ye S, Dawson JA, Kendziorski C. Extending information retrieval methods to personalized genomic-based studies of disease. Cancer Inform 2014;13:85–95. doi:10.4137/CIN.S16354.)
+
+// Modifications by  (C) Copyright 2017 Colin Crooks (colin.crooks@nottingham.ac.uk)
 
 // This file is part of sslda.
 
-// sslda is free software; you can redistribute it and/or modify it under
+//sslda is free software; you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free
-// Software Foundation; either version 2 of the License, or (at your
+// Software Foundation; either version 3 of the License, or (at your
 // option) any later version.
 
-// sslda is distributed in the hope that it will be useful, but WITHOUT
+//sslda is distributed in the hope that it will be useful, but WITHOUT
 // ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
 // FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-// for more details.
+// for more cov_betails.
 
-// You should have eceived a copy of the GNU General Public License
+// You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 // USA
+
 
 
 #include <time.h>
@@ -46,13 +49,15 @@ sslda::sslda()
     size_vocab = 0;
 	time_start = 0;
 	events = nullptr;
+	event_times = 0;
 	basehaz = nullptr; 
 	cumbasehaz = nullptr;
-	delta = nullptr;
 	ddelta = nullptr;
-	ldelta = 0.0;
 	topic_beta = nullptr;
+	covariatesN = 0;
 	cov_beta = nullptr;
+	lambda = 0;
+
 }
 
 sslda::~sslda()
@@ -78,21 +83,20 @@ void sslda::init(double alpha_, int num_topics_,
 	lambda = 0.0;
 	covariatesN = covariatesN_;
     event_times = c->event_times;
+	events = new int[event_times];
+	for (int r = 0; r < event_times; r++)
+	{
+		events[r] = 0;
+	}
 	time_start = c->time_start;
-
-	delta = new double *[num_topics];
 	ddelta = new double* [num_topics];
-	ldelta = 0.0;
     for (int k = 0; k < num_topics; k++)
     {
-		delta[k] = new double[size_vocab];
 		ddelta[k] = new double[size_vocab];
 
 		for (int w = 0; w < size_vocab; w++)
 		{
-			delta[k][w] = 0.0;
 			ddelta[k][w] = 0.0;
-
 		}
     }
 	
@@ -122,6 +126,13 @@ void sslda::init(double alpha_, int num_topics_,
 
 void sslda::free_model()
 {
+	size_vocab = 0;
+	num_topics = 0;
+	lambda = 0.0;
+	covariatesN = 0;
+	event_times = 0;
+	time_start = 0;
+	lambda = 0;
 	if (events != nullptr)
 	{
 		delete[] events;
@@ -133,13 +144,20 @@ void sslda::free_model()
 		delete[] basehaz;
 		basehaz = nullptr;
 	}
-	if (delta != nullptr)
+	if (cumbasehaz != nullptr)
 	{
-		for (int k = 0; k < num_topics; k++)
-			delete[] delta[k];
-
-		delete[] delta;
-		delta = nullptr;
+		delete[] cumbasehaz;
+		cumbasehaz = nullptr;
+	}
+	if (eta != nullptr)
+	{
+		delete[] eta;
+		eta = nullptr;
+	}
+	if (alpha != nullptr)
+	{
+		delete[] alpha;
+		alpha = nullptr;
 	}
 	if (ddelta != nullptr)
 	{
@@ -159,7 +177,6 @@ void sslda::free_model()
 		delete[] cov_beta;
 		cov_beta = nullptr;
 	}
-
 }
 
 /*
@@ -656,10 +673,9 @@ int sslda::v_em(const corpus * c, const settings * setting,
 			var_gamma[d][k] = 0.0;
 	}
 	
-	events = new int[event_times];
+
 	for (int r = 0; r < event_times; r++)
 	{
-		events[r] = 0;
 		xb[r] = 0.0;
 	}
 	std::cout << "Initializing latent variables using ";
@@ -808,13 +824,14 @@ int sslda::v_em(const corpus * c, const settings * setting,
 		std::cout << "**** M - Step ****" <<std::endl;
 
 		f = mle(ss, BETA_UPDATE, setting);
-		if (setting->includeETA==1)		likelihood += ldelta;
+//		std::cout << std::endl << "M step Likelihood: " << f << std::endl << std::endl;
+//  	if (setting->includeETA==1)		likelihood += ldelta;
 		///////  check for convergence    /////// 
 		converged = (likelihood_old - likelihood) / likelihood_old;
 		if (converged < 0) 
 			var_max_iter *=  2;
 
-
+//		std::cout << std::endl << "Overall Likelihood: " << likelihood << std::endl << std::endl;
 		likelihood_old = likelihood;
 
 		///////  output model and likelihood    /////// 
@@ -857,15 +874,15 @@ int sslda::v_em(const corpus * c, const settings * setting,
 	std::cout << "Final likelihood " << likelihood << "\t" << converged << std::endl;
 	std::cout << "Perplexity: " << exp(-likelihood/c->num_total_words) << std::endl;
 
-	stringstream filename_g;
-	filename_g << directory << "//train-gamma.dat";
-	save_gamma(filename_g.str().c_str(), var_gamma, c->num_docs);
-	std::cout << "Topic allocation gamma saved in " << filename_g.str() << std::endl;
+	//stringstream filename_g;
+	//filename_g << directory << "//train-gamma.dat";
+	//save_gamma(filename_g.str().c_str(), var_gamma, c->num_docs);
+	//std::cout << "Topic allocation gamma saved in " << filename_g.str() << std::endl;
 
-	stringstream filename_z;
-	filename_z << directory << "//train-zbar.dat";
-	save_zbar(filename_z.str().c_str(), ss->z_bar, c->num_docs);
-	std::cout << "Topic probability z_bar saved in " << filename_z.str() << std::endl;
+//	stringstream filename_z;
+//	filename_z << directory << "//train-zbar.dat";
+//	save_zbar(filename_z.str().c_str(), ss->z_bar, c->num_docs);
+//	std::cout << "Topic probability z_bar saved in " << filename_z.str() << std::endl;
 
 
 	free_suffstats(ss);
@@ -883,10 +900,11 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 	int  i, j, k, w, d;
 	double * xb = new double[event_times]; //denomimator for hazard of people at risk at each time point
 	double  xb2 = 0.0, exb = 0.0, exb2 = 0.0;
-
+	
 	if (setting->includeETA == 1)
 	{
 		double eta_sum{ 0 };
+
 		double * eta_ss = nullptr;
 		eta_ss = new double[size_vocab];
 		for (w = 0; w < size_vocab; w++)
@@ -894,28 +912,17 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			eta_sum += eta[w];
 			eta_ss[w] = 0;
 		}
-		
-
-		ldelta = num_topics*boost::math::lgamma(eta_sum);
-		for (w = 0; w < size_vocab; w++)
-		{
-			ldelta -= num_topics*boost::math::lgamma(eta[w]);
-		}
 
 		for (k = 0; k < num_topics; k++)
 		{
-			double normaliser = 0.0;
+			double dig_sumdelta = boost::math::digamma(eta_sum + ss->word_total_ss[k]);
 			for (w = 0; w < size_vocab; w++)
 			{
-				delta[k][w] = eta[w] + ss->word_ss[k][w];
-				ddelta[k][w] = boost::math::digamma(delta[k][w]) - boost::math::digamma(eta_sum + ss->word_total_ss[k]);
-				ldelta += (eta[w] - 1.0) * boost::math::digamma(delta[k][w]);
+				ddelta[k][w] = (boost::math::digamma(eta[w] + ss->word_ss[k][w]) - dig_sumdelta); //dig_sumdelta not necessary for inference but correct for likelihood
 				if (ddelta[k][w] < -800)
 					ddelta[k][w] = -800;
-				normaliser += delta[k][w];
-				eta_ss[w] += ddelta[k][w];
+				eta_ss[w] += ddelta[k][w];  // sufficient statistic for eta update
 			}
-			ldelta -= (eta[w] - 1.0) *boost::math::digamma(normaliser);
 		}
 		if (setting->ETA == 1 && BETA_UPDATE == 1 )
 		{
@@ -923,10 +930,6 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 				num_topics,
 				size_vocab,
 				setting); // means some words are a priori more likely than others for each topic across whole document
-			std::cout << "New eta: ";
-			for (w = 0; w < size_vocab; w++)
-				std::cout << eta[w] << ", ";
-			std::cout << std::endl;
 			delete[] eta_ss;
 		}
 
@@ -946,8 +949,8 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 		}
 	}
 
+	
 	if (BETA_UPDATE == 0) return 0;
-
 	if (setting->ALPHA == 1)
 	{
 		opt_alpha(alpha, ss->alpha_ss,
@@ -959,10 +962,6 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			std::cout << alpha[k] << ", ";
 		std::cout << std::endl;
 	}
-
-
-
-
 	const int nt = num_topics + covariatesN  - 1; //Important to drop a topic from MLE to ensure a baseline group (otherwise cox model estimates can drift excessively)
 	lambda = pow(10, setting->LAMBDASTART);
 	const int lambdarange = 1 + setting->LAMBDAEND - setting->LAMBDASTART;
@@ -1445,10 +1444,14 @@ double sslda::doc_e_step(document* doc, int docN,  double* gamma, double** phi, 
 	int n, k;
 
 	double likelihood = 0.0;
-    if (BETA_UPDATE == 1)
-        likelihood = sslda_inference(doc, gamma, phi,  oldphi, dig, cbhz_params, var_converged, var_max_iter);
-    else
-        likelihood = lda_inference(doc, gamma, phi,  oldphi, dig , var_converged, var_max_iter);
+	if (BETA_UPDATE == 1)
+	{
+		likelihood = sslda_inference(doc, gamma, phi, oldphi, dig, cbhz_params, var_converged, var_max_iter);
+	}
+	else
+	{
+		likelihood = lda_inference(doc, gamma, phi, oldphi, dig, var_converged, var_max_iter);
+	}
 	if (isn(likelihood))
 		return likelihood;
 
@@ -1551,10 +1554,12 @@ double sslda::lda_compute_likelihood(document* doc, double** phi, double* var_ga
     likelihood = boost::math::lgamma(alpha_sum) - boost::math::lgamma(var_gamma_sum); // A5 and A8
 
 
+
     for (k = 0; k < num_topics; k++)
     {
         likelihood += - boost::math::lgamma(alpha[k]) + (alpha[k] - 1.0)*(dig[k] - digsum) +
                       boost::math::lgamma(var_gamma[k]) - (var_gamma[k] - 1.0)*(dig[k] - digsum); // A5 and A8
+
 
         for (n = 0; n < doc->length; n++)
         {
@@ -1562,8 +1567,10 @@ double sslda::lda_compute_likelihood(document* doc, double** phi, double* var_ga
             {
 				likelihood += doc->counts[n] *(phi[n][k] * ((dig[k] - digsum) -
 					log(phi[n][k]) + ddelta[k][doc->words[n]])); ///combines components from A6, A7 and A8 all multiplied by phi[n][k]
-            }
+
+			}
         }
+
     }
     return likelihood;
 }
@@ -1689,6 +1696,7 @@ double sslda::sslda_compute_likelihood(document* doc, double** phi, double* var_
 				likelihood += doc->counts[n] * (phi[n][k] * ((dig[k] - digsum) - log(phi[n][k]) + ddelta[k][doc->words[n]]));
 				if (doc->label > 0)
 					temp += topic_beta[k] * doc->counts[n] * phi[n][k];
+
 			}
 		}
 	}
@@ -1835,7 +1843,7 @@ double sslda::infer_only(const corpus * c, const settings * setting, double *per
 		mark[d] = count;
 	}
 
-#pragma omp parallel reduction(+:num,den) default(none) shared(docscore, c, mark)
+#pragma omp parallel reduction(+:num,den) /*default(none)*/ shared(docscore, c, mark)
 	{
 		int dl, ddl;
 		int size=omp_get_num_threads(); // get total number of processes
@@ -1863,7 +1871,7 @@ double sslda::infer_only(const corpus * c, const settings * setting, double *per
 	delete[] mark;
 	mark = nullptr;
 
-	delete [] docscore;
+	delete[] docscore;
 	docscore = nullptr;
 	*perplexity = exp(-(*loglik) / c->num_total_words);
 	
@@ -1896,10 +1904,10 @@ double sslda::infer_only(const corpus * c, const settings * setting, double *per
 			std::cerr << "unable to open " << filename.str() << std::endl;
 
 
-		stringstream filename_g;
-		filename_g << directory << "//inf-gamma.dat";
-		save_gamma(filename_g.str().c_str(), var_gamma, c->num_docs);
-		std::cout << "Topic allocation gamma saved in " << filename_g.str() << std::endl;
+//		stringstream filename_g;
+//		filename_g << directory << "//inf-gamma.dat";
+//		save_gamma(filename_g.str().c_str(), var_gamma, c->num_docs);
+//		std::cout << "Topic allocation gamma saved in " << filename_g.str() << std::endl;
 
 		stringstream filename_z;
 		filename_z << directory << "//inf-zbar.dat";
@@ -1910,12 +1918,10 @@ double sslda::infer_only(const corpus * c, const settings * setting, double *per
 		delete[] var_gamma[d];
 	delete [] var_gamma;
 	var_gamma = nullptr;
-
 	for (d = 0; d < c->num_docs; d++)
 		delete[] z_bar[d];
 	delete [] z_bar;
 	z_bar = nullptr;
-	
 	return static_cast<double>(num) / static_cast<double>(den);
 }
 

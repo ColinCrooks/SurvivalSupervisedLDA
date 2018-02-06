@@ -1,12 +1,14 @@
-// (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei
+// Latent Dirichlet Allocation supervised by penalised Cox proportional hazards modelling with optional learning of asymmetrical priors.
 
-// written by Chong Wang, chongw@cs.princeton.edu
+//This has been modified from the original code (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei ([1] Blei DM, McAuliffe JD. Supervised Topic Models. Adv Neural Inf Process Syst 20 2007:121–8.) and modified following the algorithms developed by Ye et al. 2014 ([1] Ye S, Dawson JA, Kendziorski C. Extending information retrieval methods to personalized genomic-based studies of disease. Cancer Inform 2014;13:85–95. doi:10.4137/CIN.S16354.)
 
-// This file is part ofsslda.
+// Modifications by  (C) Copyright 2017 Colin Crooks (colin.crooks@nottingham.ac.uk)
+
+// This file is part of sslda.
 
 //sslda is free software; you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free
-// Software Foundation; either version 2 of the License, or (at your
+// Software Foundation; either version 3 of the License, or (at your
 // option) any later version.
 
 //sslda is distributed in the hope that it will be useful, but WITHOUT
@@ -18,6 +20,7 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 // USA
+
 #ifndef OPT_H_INCLUDED
 #define OPT_H_INCLUDED
 

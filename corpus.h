@@ -1,8 +1,10 @@
 // Latent Dirichlet Allocation supervised by penalised Cox proportional hazards modelling with optional learning of asymmetrical priors.
 
-//This has been developed from the original code (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei ([1] Blei DM, McAuliffe JD. Supervised Topic Models. Adv Neural Inf Process Syst 20 2007:121–8.) and modified following the algorithms developed by Ye et al. 2014 ([1] Ye S, Dawson JA, Kendziorski C. Extending information retrieval methods to personalized genomic-based studies of disease. Cancer Inform 2014;13:85–95. doi:10.4137/CIN.S16354.)
+//This has been modified from the original code (C) Copyright 2009, Chong Wang, David Blei and Li Fei-Fei ([1] Blei DM, McAuliffe JD. Supervised Topic Models. Adv Neural Inf Process Syst 20 2007:121–8.) and modified following the algorithms developed by Ye et al. 2014 ([1] Ye S, Dawson JA, Kendziorski C. Extending information retrieval methods to personalized genomic-based studies of disease. Cancer Inform 2014;13:85–95. doi:10.4137/CIN.S16354.)
 
-// Modifications by Colin Crooks (colin.crooks@nottingham.ac.uk)
+// Modifications by  (C) Copyright 2017 Colin Crooks (colin.crooks@nottingham.ac.uk)
+
+// This file is part of sslda.
 
 //sslda is free software; you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free
@@ -18,6 +20,7 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 // USA
+
 
 #ifndef CORPUS_H
 #define CORPUS_H
@@ -53,9 +56,9 @@ public:
 public:
     document()
     {
-        words = NULL;
-        counts = NULL;
-		covariates = NULL;
+        words = nullptr;
+        counts = nullptr;
+		covariates = nullptr;
         length = 0;
         total = 0;
         label = 0;
@@ -76,20 +79,24 @@ public:
     }
 	~document()
 	{
-		if (words != NULL)
+		free();
+	}
+	void free()
+	{
+		if (words != nullptr)
 		{
 			delete[] words;
-			words = NULL;
+			words = nullptr;
 		}
-		if (counts != NULL)
+		if (counts != nullptr)
 		{
 			delete[] counts;
-			counts = NULL;
+			counts = nullptr;
 		}
-		if (covariates != NULL)
+		if (covariates != nullptr)
 		{
 			delete[] covariates;
-			covariates = NULL;
+			covariates = nullptr;
 		}
 
         length = 0;
@@ -105,8 +112,10 @@ class corpus
 public:
     corpus();
     ~corpus();
+	void free();
     int read_data(const char * data_filename, const settings * setting);
 	int read_adj(const char * data_filename, const settings * setting);
+	int sample(corpus* s, corpus* s_val, const settings * setting);
 
 public:
     int num_docs;
