@@ -102,7 +102,7 @@ int main(int argc, char* argv[])
 		int test = model.v_em(&c, &setting, init_method.c_str(), directory.c_str() );
 		if(test !=1)
 			std::cerr << "Model returned " << test << std::endl;
-		model.free();
+		model.free_model();
 		c.free();
     }
 	if (strcmp(argv[1], "bootstrap") == 0)
@@ -261,7 +261,7 @@ int main(int argc, char* argv[])
 		double test = model.coxonly(&c, &setting);
 		if (test != 1)
 			std::cerr << "Model returned " << test << std::endl;
-		model.free();
+		model.free_model();
 		c.free();
 	}
     else if (strcmp(argv[1], "inf") == 0)
@@ -301,7 +301,7 @@ int main(int argc, char* argv[])
 		double Cstat = model.infer_only(&c, &setting, &perplexity, &loglik , directory.c_str() ,1 );
 		if (isn(Cstat))
 			std::cerr << "Error in calculating C statistic" << std::endl;
-		model.free();
+		model.free_model();
 		c.free();
 	 }
 	else if (strcmp(argv[1], "range") == 0)
