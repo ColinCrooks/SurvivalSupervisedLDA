@@ -289,9 +289,9 @@ int corpus::sample(corpus* s, corpus* s_val, const settings* setting)
 	s->event_times = s->time_end - s->time_start + 1;
 	s->num_docs = nd;
 	s->size_vocab = nw;
-	std::cout << "Training Nnmber of docs  : " << s->num_docs << std::endl;
+	std::cout << "Training number of docs  : " << s->num_docs << std::endl;
 	std::cout << "Training number of terms : " << s->size_vocab << std::endl;
-	std::cout << "Training notal number of words : " << s->num_total_words << std::endl;
+	std::cout << "Training total number of words : " << s->num_total_words << std::endl;
 	assert(nd == int(s->docs.size()));
 	std::cout << "Training number of event times : " << s->event_times;
 	std::cout << " from " << s->time_start << " to " << s->time_end << std::endl << std::endl;

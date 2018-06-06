@@ -37,6 +37,8 @@ double opt_alpha(double * a, double * ss, int D, int K, const settings* setting)
 {
 	double init_a = 1.0/static_cast<double>(K);
 	double * log_a = new double[K];
+	double lower_a=log(init_a/10.0);
+	double upper_a=log(init_a*10.0);
 	for (int k = 0; k < K; k++)
 	{
 		log_a[k] = log(init_a);
@@ -46,7 +48,7 @@ double opt_alpha(double * a, double * ss, int D, int K, const settings* setting)
 	double oldf = 0.0, f = 0.0, df = 0.0, d2f = 0.0;
 
 	int iter = 0;
-
+	
 	for (iter = 1; iter <= setting->MSTEP_MAX_ITER ; iter++)
 	{
 		oldf = f;
@@ -77,15 +79,15 @@ double opt_alpha(double * a, double * ss, int D, int K, const settings* setting)
 			log_a[k] = log_a[k] -  df / (d2f * a[k] + df) ;
 			//std::cout << "alpha " << a[k] << "; a_sum " << a_sum <<
 			//	"; f " << f << "; df " << df << "; d2f " << d2f << "; log_a[k] " << log_a[k] << " ss[k] " << ss[k] << std::endl;
-			if (log_a[k] < -10.0 || isnan(log_a[k]))
+			if (log_a[k] < lower_a || isnan(log_a[k]))
 			{
-				log_a[k] = -10.0;
+				log_a[k] = lower_a;
 				a[k] = exp(log_a[k]);
 				stop += 1;
 			}
-			else if (log_a[k] > 2 )
+			else if (log_a[k] > upper_a )
 			{
-				log_a[k] = 2 ;
+				log_a[k] = upper_a ;
 				a[k] = exp(log_a[k]);
 				stop += 1;
 			}

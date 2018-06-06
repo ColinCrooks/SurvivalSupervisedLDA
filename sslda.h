@@ -103,9 +103,9 @@ public:
 	double * cumbasehaz = nullptr; // cummulative baseline hazard
 	double *topic_beta = nullptr; //beta for the latent topic hazard ratios
 	double * cov_beta = nullptr; // beta for the additional covariates adjusted for
-//	double ** delta = nullptr; // parameter for the topic word dirichlet 
+	double ** delta = nullptr; // parameter for the topic word dirichlet 
 	double ** ddelta = nullptr; // expectation of the topic word dirichlet
-//	double  ldelta; // log likelihood component from the word topic dirichlet 
+	double  ldelta; // log likelihood component from the word topic dirichlet 
 };
 
 #endif // SSLDA_H

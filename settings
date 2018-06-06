@@ -2,18 +2,19 @@ No of documents to seed model. NUM_INIT =10000
 No of iterations between displaying and saving current output. LAG =1
 No of non survival LDA iterations. LDA_INIT_M =5
 Max No of iterations for each document's estimation to converge. VAR_MAX_ITER =10
-Tolerance for each document's estimation to converge. VAR_CONVERGED =1e-6
+Tolerance for each document's estimation to converge (only reaches setting for EM_CONVERGED). VAR_CONVERGED =1e-3
 Max No of iterations for maximum likelihood fitting of Cox model. MSTEP_MAX_ITER =10
-Tolerance for maximum likelihood fitting of Cox model to converge. MSTEP MAX_EPS =1e-6
-Max No of iterations for overall estimation maximisation steps. EM_MAX_ITER =30
-Tolerance for estimation maximisation algorithm to converge. EM_CONVERGED =1e-2
+Tolerance for maximum likelihood fitting of Cox model to converge (only reaches setting for EM_CONVERGED). MSTEP MAX_EPS =1e-3
+Max No of iterations for overall estimation maximisation steps. EM_MAX_ITER =20
+Tolerance for estimation maximisation algorithm to converge. EM_CONVERGED =1e-3
 Offset for reading in word/terms (i.e  do they start at 0 or 1) =1
 Total number of variable categories to adjust for adjustedN =0
-Start of path for lambda 10eLAMBDASTART  LAMBDASTART =0
+Start of path for lambda 10eLAMBDASTART  LAMBDASTART =-4
 End of path for lambda 10eLAMBDAEND  LAMBDAEND =4
 Number of groups for cross validation CROSSVAL =5
-Alpha to be estimated (1) or fixed (0)? ALPHA =1
-ETA to be estimated (1) or fixed (0)? ETA =0
+Topic distribution prior (Alpha) to be estimated (1) or fixed (0)? ALPHA =1
+Within topic word distribution (ETA) to be included (1) or omitted (0)? includeETA =1
+ETA to be estimated (1) or fixed (0)? ETA =1
 Initial proportionate increase in weight on the baseline group =1
  
 NOTE 

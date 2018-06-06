@@ -174,7 +174,7 @@ int main(int argc, char* argv[])
 			stringstream val_model_filename;
 			val_model_filename << iterdirectory.c_str() << "\\final.model";
 			sslda model_val;
-			model_val.load_model(val_model_filename.str().c_str());
+			if(model_val.load_model(val_model_filename.str().c_str())!=1) return -1;
 			std::cout << val_model_filename.str() << " reloaded for validation " << std::endl;
 			cstat[i] = model_val.infer_only(&s_val, &setting, &perplexity[i], &loglik[i], iterdirectory.c_str(), 0);
 			model_val.free_model();
@@ -294,7 +294,7 @@ int main(int argc, char* argv[])
 		}
 		sslda model;
 		double perplexity, loglik;
-        model.load_model(model_filename.c_str());
+        if(model.load_model(model_filename.c_str())!=1) return -1;
 		std::cout << std::endl << "Model file found in " << model_filename << std::endl;
 		std::cout << "Number of topics is " << model.num_topics << std::endl;
 		std::cout << "Lambda = " << model.lambda << std::endl;
@@ -385,7 +385,7 @@ int main(int argc, char* argv[])
 				stringstream val_model_filename;
 				val_model_filename << subdirectory.str() << "\\final.model";
 				sslda model_val;
-				model_val.load_model(val_model_filename.str().c_str());
+				if(model_val.load_model(val_model_filename.str().c_str())!=1) return -1;
 				std::cout << val_model_filename.str() << " reloaded for validation on " << data_val_filename << std::endl;
 				cstat[i] = model_val.infer_only(&c_val, &setting, &perplexity[i], &loglik[i], subdirectory.str().c_str() , 1);
 				model_val.free_model();

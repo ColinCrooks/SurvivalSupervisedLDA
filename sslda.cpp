@@ -52,6 +52,8 @@ sslda::sslda()
 	event_times = 0;
 	basehaz = nullptr; 
 	cumbasehaz = nullptr;
+	ldelta = 0.0;
+	delta = nullptr;
 	ddelta = nullptr;
 	topic_beta = nullptr;
 	covariatesN = 0;
@@ -89,11 +91,20 @@ void sslda::init(double alpha_, int num_topics_,
 		events[r] = 0;
 	}
 	time_start = c->time_start;
+	ldelta = 0.0;
+	delta = new double* [num_topics];
+    for (int k = 0; k < num_topics; k++)
+    {
+		delta[k] = new double[size_vocab];
+		for (int w = 0; w < size_vocab; w++)
+		{
+			delta[k][w] = 0.0;
+		}
+    }
 	ddelta = new double* [num_topics];
     for (int k = 0; k < num_topics; k++)
     {
 		ddelta[k] = new double[size_vocab];
-
 		for (int w = 0; w < size_vocab; w++)
 		{
 			ddelta[k][w] = 0.0;
@@ -133,6 +144,7 @@ void sslda::free_model()
 	event_times = 0;
 	time_start = 0;
 	lambda = 0;
+	ldelta = 0.0;
 	if (events != nullptr)
 	{
 		delete[] events;
@@ -158,6 +170,14 @@ void sslda::free_model()
 	{
 		delete[] alpha;
 		alpha = nullptr;
+	}
+	if (delta != nullptr)
+	{
+		for (int k = 0; k < num_topics; k++)
+			delete[] delta[k];
+
+		delete[] delta;
+		delta = nullptr;
 	}
 	if (ddelta != nullptr)
 	{
@@ -193,6 +213,9 @@ int sslda::save_model(const char * filename)
 		file.write(reinterpret_cast<char*>(&size_vocab), sizeof (int));
 		file.write(reinterpret_cast<char*>(&event_times), sizeof (int));
 		file.write(reinterpret_cast<char*>(&lambda), sizeof (double));
+		file.write(reinterpret_cast<char*>(&ldelta), sizeof (double));
+		for (int k = 0; k < num_topics; k++)
+			file.write(reinterpret_cast<char*>(&delta[k][0]), sizeof(double)* size_vocab);
 		for (int k = 0; k < num_topics; k++)
 			file.write(reinterpret_cast<char*>(&ddelta[k][0]), sizeof(double)* size_vocab);
 		file.write(reinterpret_cast<char*>(&topic_beta[0]), sizeof(double)* num_topics);
@@ -221,7 +244,13 @@ int sslda::load_model(const char * filename)
 		file.read(reinterpret_cast<char*>(&size_vocab), sizeof (int));
 		file.read(reinterpret_cast<char*>(&event_times), sizeof (int));
 		file.read(reinterpret_cast<char*>(&lambda), sizeof (double));
-
+		file.read(reinterpret_cast<char*>(&ldelta), sizeof (double));
+		delta = new double *[num_topics];
+		for (int k = 0; k < num_topics; k++)
+		{
+			delta[k] = new double[size_vocab];
+			file.read(reinterpret_cast<char*>(&delta[k][0]), sizeof(double)* size_vocab);
+		}
 		ddelta = new double *[num_topics];
 		for (int k = 0; k < num_topics; k++)
 		{
@@ -816,7 +845,7 @@ int sslda::v_em(const corpus * c, const settings * setting,
 			oldphi = nullptr;
 
 		}
-		
+		likelihood+=ldelta;
 
 		std::cout << std::endl << "Likelihood: " << likelihood << std::endl << std::endl;
 
@@ -903,8 +932,8 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 	
 	if (setting->includeETA == 1)
 	{
+		ldelta = 0.0;
 		double eta_sum{ 0 };
-
 		double * eta_ss = nullptr;
 		eta_ss = new double[size_vocab];
 		for (w = 0; w < size_vocab; w++)
@@ -915,15 +944,29 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 
 		for (k = 0; k < num_topics; k++)
 		{
+			double delta_sum{0};
 			double dig_sumdelta = boost::math::digamma(eta_sum + ss->word_total_ss[k]);
 			for (w = 0; w < size_vocab; w++)
 			{
-				ddelta[k][w] = (boost::math::digamma(eta[w] + ss->word_ss[k][w]) - dig_sumdelta); //dig_sumdelta not necessary for inference but correct for likelihood
+				double delta = eta[w]+ss->word_ss[k][w];
+				ddelta[k][w] = (boost::math::digamma(delta) - dig_sumdelta); //dig_sumdelta not necessary for inference but correct for likelihood
+				ldelta+= boost::math::lgamma(delta) -  ((delta-1)*ddelta[k][w]);
+				ldelta+=-boost::math::lgamma(eta[w])+ ((eta[w]-1)*ddelta[k][w]) ;
+				delta_sum+=delta;
 				if (ddelta[k][w] < -800)
 					ddelta[k][w] = -800;
+/* 				if (w > 0)
+					ddelta_norm = log_sum(ddelta_norm, ddelta[k][w]);
+				else
+					ddelta_norm = ddelta[k][w]; // note, phi is in log space
+ */
 				eta_ss[w] += ddelta[k][w];  // sufficient statistic for eta update
 			}
-		}
+			ldelta+=boost::math::lgamma(eta_sum);
+			ldelta-=boost::math::lgamma(delta_sum);
+/* 			for (w = 0; w < size_vocab; w++)
+				ddelta[k][w] = ddelta[k][w] - ddelta_norm; //shouldn't be necessary?
+ */		}
 		if (setting->ETA == 1 && BETA_UPDATE == 1 )
 		{
 			opt_alpha(eta, eta_ss,
@@ -932,8 +975,6 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 				setting); // means some words are a priori more likely than others for each topic across whole document
 			delete[] eta_ss;
 		}
-
-	
 	}
 	else
 	{
@@ -1542,25 +1583,25 @@ double sslda::lda_compute_likelihood(document* doc, double** phi, double* var_ga
 	double likelihood = 0, digsum = 0, var_gamma_sum = 0;
 
 	int k, n;
-	double alpha_sum = 0.0;
+	double alpha_sum{0};
+
 	for (k = 0; k < num_topics; k++)
 	{
 		alpha_sum += alpha[k];
 		dig[k] = boost::math::digamma(var_gamma[k]);
 		var_gamma_sum += var_gamma[k];
 	}
+
     digsum = boost::math::digamma(var_gamma_sum);
 
     likelihood = boost::math::lgamma(alpha_sum) - boost::math::lgamma(var_gamma_sum); // A5 and A8
-
-
-
+	
     for (k = 0; k < num_topics; k++)
     {
         likelihood += - boost::math::lgamma(alpha[k]) + (alpha[k] - 1.0)*(dig[k] - digsum) +
                       boost::math::lgamma(var_gamma[k]) - (var_gamma[k] - 1.0)*(dig[k] - digsum); // A5 and A8
-
-
+	
+	
         for (n = 0; n < doc->length; n++)
         {
 			if (phi[n][k] > 0)
@@ -1750,7 +1791,6 @@ double sslda::infer_only(const corpus * c, const settings * setting, double *per
 			z_bar[d][k] = 0.0;
 	}
 
-
 	double * docscore = new double [c->num_docs];
 	for (d = 0; d < c->num_docs; d++)
 		docscore[d] = 0.0;
@@ -1815,7 +1855,7 @@ double sslda::infer_only(const corpus * c, const settings * setting, double *per
 		delete [] oldphi;
 		oldphi = nullptr;
 	}
-	*loglik = lik;
+	*loglik = lik+ldelta;
 	double num = 0.0, den = 0.0;
 
 	for (d = 0; d < c->num_docs; d++)
