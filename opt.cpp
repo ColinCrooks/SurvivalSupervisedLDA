@@ -24,7 +24,7 @@
 #include "opt.h"
 #include "sslda.h"
 #include "utils.h"
-
+#include <float.h>
 
 
 
@@ -107,7 +107,7 @@ double opt_alpha(double * a, double * ss, int D, int K, const settings* setting)
 	return -f;
 }
 
-int cox_reg(double * beta, double * zbeta, double ** var, int nvar, double lambda, const suffstats * ss, double * f, const settings* setting)
+int cox_reg(double * beta, double * zbeta, double ** var, int nvar, double lambda, const suffstats * ss, double * f, const settings* setting, int base_index)
 {
 	//Mittal, S., Madigan, D., Burd, R. S., & Suchard, M. a. (2013). High-dimensional, massive sample-size Cox proportional hazards regression for survival analysis. Biostatistics (Oxford, England), 1–15. doi:10.1093/biostatistics/kxt043
 	int i,k, person, iter;
@@ -123,7 +123,7 @@ int cox_reg(double * beta, double * zbeta, double ** var, int nvar, double lambd
 
 	for (i = 0; i < nvar; i++)
 	{
-		newbeta[i] = beta[i];
+		newbeta[i] = ((i==base_index) ? 0.0 : beta[i]) ;
 		step[i] = 1.0;
 	}
 
@@ -132,16 +132,19 @@ int cox_reg(double * beta, double * zbeta, double ** var, int nvar, double lambd
 
 		zbeta[person] = 0.0;
 		for (i = 0; i < nvar; i++)
+		{
+			if (i == base_index) continue;
 			zbeta[person] += var[person][i] * newbeta[i];
+		}
 		zbeta[person] = zbeta[person] >22 ? 22 : zbeta[person];
 		zbeta[person] = zbeta[person] < -200 ? -200 : zbeta[person];
 	}
-	for (iter=1; iter<=setting->MSTEP_MAX_ITER; iter++) 
+	for (iter=1; iter<=setting->MSTEP_MAX_ITER;  iter++) 
 	{
-		newlk = -(log(sqrt(lambda)) * nvar);
+		newlk = -(log(sqrt(lambda)) * (nvar-1));
 		for (i = 0; i < nvar; i++)
 		{
-
+			if (i == base_index) continue;
 			/*
 			** The data is sorted from smallest time to largest
 			** Start at the largest time, accumulating the risk set 1 by 1
@@ -222,8 +225,11 @@ int cox_reg(double * beta, double * zbeta, double ** var, int nvar, double lambd
 			lastvar = i;
 		}
 		
-		for( i = 0 ; i < nvar ; i++)
+		for (i = 0; i < nvar; i++)
+		{
+			if (i == base_index) continue;
 			newlk -= (newbeta[i] * newbeta[i]) / (2.0 * lambda);
+		}
 		if (fabs(1.0 - (newlk / loglik)) <= setting->MAX_EPS) break;
 		loglik = newlk;
 	}   /* return for another iteration */
@@ -249,8 +255,6 @@ int cox_reg(double * beta, double * zbeta, double ** var, int nvar, double lambd
 	return iter;
 }
 
-
-
 double cox_reg_cross_val(
 	int group, 
 	double * newbeta, 
@@ -258,7 +262,8 @@ double cox_reg_cross_val(
 	int nvar, 
 	double lambda, 
 	const suffstats * ss, 
-	const settings* setting)
+	const settings* setting,
+	int base_index)
 {
     int i,k, r, person, iter;
     int nused = ss->num_docs, lastvar = 0;
@@ -280,8 +285,11 @@ double cox_reg_cross_val(
 	for (person = nused - 1; person >= 0; person--)
 	{
 		zbeta[person] = 0.0;
-		for (i = 0; i<nvar; i++)
+		for (i = 0; i < nvar; i++)
+		{
+			if (i == base_index) continue;
 			zbeta[person] += newbeta[i] * var[person][i];
+		}
 		zbeta[person] = zbeta[person] >22 ? 22 : zbeta[person];
 		zbeta[person] = zbeta[person] < -200 ? -200 : zbeta[person];
 	}
@@ -289,14 +297,13 @@ double cox_reg_cross_val(
 	for (iter=1; iter<=setting->MSTEP_MAX_ITER; iter++) 
 	{
 		newlk = -log(sqrt(lambda)); // New likelihood for current iteration
-		for (i=0; i<nvar; i++) 
+		for (i = 0; i<nvar; i++)
 		{		
 			/*
 			** The data is sorted from smallest time to largest
 			** Start at the largest time, accumulating the risk set 1 by 1
 			*/
-
-		
+			if (i == base_index) continue;
 
 			for (r = ntimes - 1; r >= 0; r--)
 			{
@@ -383,8 +390,11 @@ double cox_reg_cross_val(
 			*/
 		}
 		
-		for( i = 0 ; i < nvar ; i++)
+		for (i = 0; i < nvar; i++)
+		{
+			if (i == base_index) continue;
 			newlk -= (newbeta[i] * newbeta[i]) / (2.0 * lambda); //(l_j-1)
+		}
 		if(isn(newlk))
 			return numeric_limits<double>::lowest();
 		
@@ -409,7 +419,10 @@ double cox_reg_cross_val(
 
 		zbeta[person] = 0.0;
 		for (i = 0; i < nvar; i++)
+		{
+			if (i == base_index) continue;
 			zbeta[person] += newbeta[i] * var[person][i]; // recalculate with final iteration updated betas
+		}
 		risk = exp(zbeta[person]);
 		for (r = time_index_entry; r <= time_index_exit; r++)
 			denom[r] += risk;
@@ -441,8 +454,9 @@ double cox_reg_cross_val(
 		}
 		
 	}
-	for( i = 0 ; i < nvar ; i++)
+	for (i = 0; i < nvar; i++)
 	{
+		if (i == base_index) continue;
 		loglik -= log(sqrt(lambda))  + ((newbeta[i] * newbeta[i]) / (2.0 * lambda)); 
 		newlk -= log(sqrt(lambda))  + ((newbeta[i] * newbeta[i]) / (2.0 * lambda)); 
 	}

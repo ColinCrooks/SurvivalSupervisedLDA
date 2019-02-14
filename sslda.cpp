@@ -53,7 +53,6 @@ sslda::sslda()
 	basehaz = nullptr; 
 	cumbasehaz = nullptr;
 	ldelta = 0.0;
-	delta = nullptr;
 	ddelta = nullptr;
 	topic_beta = nullptr;
 	covariatesN = 0;
@@ -92,15 +91,6 @@ void sslda::init(double alpha_, int num_topics_,
 	}
 	time_start = c->time_start;
 	ldelta = 0.0;
-	delta = new double* [num_topics];
-    for (int k = 0; k < num_topics; k++)
-    {
-		delta[k] = new double[size_vocab];
-		for (int w = 0; w < size_vocab; w++)
-		{
-			delta[k][w] = 0.0;
-		}
-    }
 	ddelta = new double* [num_topics];
     for (int k = 0; k < num_topics; k++)
     {
@@ -171,14 +161,7 @@ void sslda::free_model()
 		delete[] alpha;
 		alpha = nullptr;
 	}
-	if (delta != nullptr)
-	{
-		for (int k = 0; k < num_topics; k++)
-			delete[] delta[k];
 
-		delete[] delta;
-		delta = nullptr;
-	}
 	if (ddelta != nullptr)
 	{
 		for (int k = 0; k < num_topics; k++)
@@ -215,8 +198,6 @@ int sslda::save_model(const char * filename)
 		file.write(reinterpret_cast<char*>(&lambda), sizeof (double));
 		file.write(reinterpret_cast<char*>(&ldelta), sizeof (double));
 		for (int k = 0; k < num_topics; k++)
-			file.write(reinterpret_cast<char*>(&delta[k][0]), sizeof(double)* size_vocab);
-		for (int k = 0; k < num_topics; k++)
 			file.write(reinterpret_cast<char*>(&ddelta[k][0]), sizeof(double)* size_vocab);
 		file.write(reinterpret_cast<char*>(&topic_beta[0]), sizeof(double)* num_topics);
 		if (cov_beta != nullptr)
@@ -245,12 +226,6 @@ int sslda::load_model(const char * filename)
 		file.read(reinterpret_cast<char*>(&event_times), sizeof (int));
 		file.read(reinterpret_cast<char*>(&lambda), sizeof (double));
 		file.read(reinterpret_cast<char*>(&ldelta), sizeof (double));
-		delta = new double *[num_topics];
-		for (int k = 0; k < num_topics; k++)
-		{
-			delta[k] = new double[size_vocab];
-			file.read(reinterpret_cast<char*>(&delta[k][0]), sizeof(double)* size_vocab);
-		}
 		ddelta = new double *[num_topics];
 		for (int k = 0; k < num_topics; k++)
 		{
@@ -923,7 +898,6 @@ int sslda::v_em(const corpus * c, const settings * setting,
 }
 
 
-
 double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 {
 	int  i, j, k, w, d;
@@ -1003,7 +977,21 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			std::cout << alpha[k] << ", ";
 		std::cout << std::endl;
 	}
-	const int nt = num_topics + covariatesN  - 1; //Important to drop a topic from MLE to ensure a baseline group (otherwise cox model estimates can drift excessively)
+	
+
+	double max_ss(0.0);
+	int base_index(0);
+	for (int i = 0; i < num_topics; i++) 
+	{
+		if (max_ss < ss->word_total_ss[i]) 
+		{
+			base_index = i;
+			max_ss=ss->word_total_ss[i];
+		}
+	}
+	base_index = base_index + covariatesN;
+	
+	const int nt = num_topics + covariatesN ; 
 	lambda = pow(10, setting->LAMBDASTART);
 	const int lambdarange = 1 + setting->LAMBDAEND - setting->LAMBDASTART;
 	double ** var = new double *[ss->num_docs];
@@ -1026,6 +1014,7 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 			var[d][w] -= temp;
 	}
 
+	
 	double f = 0.0;
 	double cv = numeric_limits<double>::lowest();
 	double * newbeta = new double[nt];
@@ -1041,17 +1030,17 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 	{
 		cvbeta[i] = new double[nt];
 		for (k = 0; k < covariatesN; k++)
-			cvbeta[i][k] = cov_beta[k];
+			cvbeta[i][k] = 0.0;
 
 		for (k = covariatesN; k < nt; k++)
-			cvbeta[i][k] = topic_beta[k - covariatesN];
+			cvbeta[i][k] = 0.0;
 
 	}
 
-#pragma omp parallel  default(none) shared(cvbeta, ss, setting, fsum, var)
+	
+	
+#pragma omp parallel  default(none) shared(cvbeta, ss, setting, fsum, var, base_index)
 	{
-		
-
 		int size = omp_get_num_threads(); // get total number of processes
 		int rank = omp_get_thread_num(); // get rank of current ( range 0 -> (num_threads - 1) )
 		for (int ii = (rank * lambdarange * setting->CROSSVAL / size); ii < ((rank + 1) * lambdarange * setting->CROSSVAL / size); ii++)
@@ -1061,7 +1050,7 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 				cvbeta[ii], var, nt,
 				pow(10.0, (static_cast<double>(setting->LAMBDAEND)
 				- floor(static_cast<double>(ii) / static_cast<double>(setting->CROSSVAL))))
-				, ss, setting
+				, ss, setting, base_index
 				);
 		}
 	}
@@ -1106,7 +1095,7 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 	int miter = 0;
 
 
-	miter = cox_reg(newbeta, zbeta, var, nt, lambda, ss, &f, setting);
+	miter = cox_reg(newbeta, zbeta, var, nt, lambda, ss, &f, setting, base_index);
 
 	std::cout << " M iter = " << miter << ", f = " << f << std::endl;
 	while (isn(f))
@@ -1115,7 +1104,7 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 		for (k = 0; k < num_topics; k++)
 			newbeta[k] = 0.0;
 		std::cout << std::endl << "Proportional hazards model failed to converge. Setting lambda to " << lambda << std::endl;
-		miter = cox_reg(newbeta, zbeta, var, nt, lambda, ss, &f, setting);
+		miter = cox_reg(newbeta, zbeta, var, nt, lambda, ss, &f, setting, base_index);
 		std::cout << "Coefficients : ";
 		for (k = 0; k < nt; k++)
 		std::cout << newbeta[k] << ", ";
@@ -1615,15 +1604,104 @@ double sslda::lda_compute_likelihood(document* doc, double** phi, double* var_ga
     }
     return likelihood;
 }
+/*
+double sslda::sslda_inference(document* doc, double* var_gamma, double** phi, double* oldphi, double* dig, double* cbhz_params, const double var_converged, const int var_max_iter)
+{
+	int k, n, var_iter;
+	double converged = 1.0, phisum = 0.0, likelihood = 0.0, likelihood_old = 0.0;
+	double cbhz_prod = 1.0, temp = 0.0;
+	double cbz = cumbasehaz[doc->t_exit - time_start];
+	double cbeta = 0.0;
 
+	// compute posterior dirichlet
+	for (k = 0; k < num_topics; k++)
+	{
+		var_gamma[k] = alpha[k] + (static_cast<double>(doc->total) / static_cast<double>(num_topics));
+		dig[k] = boost::math::digamma(var_gamma[k]);
+		for (n = 0; n < doc->length; n++)
+			phi[n][k] = 1.0 / (static_cast<double>(num_topics));
+	}
+
+	//update phi and gamma
+	var_iter = 0;
+
+
+	if (covariatesN > 0)
+	{
+		for (n = 0; n < covariatesN; n++)
+			cbeta += cov_beta[n] * static_cast<double>(doc->covariates[n]);
+		cbz *= exp(cbeta);
+
+	}
+	cbhz_prod = 1.0;
+	for (n = 0; n < doc->length; n++)
+	{
+		temp = 0.0;
+		for (k = 0; k < num_topics; k++)
+			temp += phi[n][k] * exp(topic_beta[k] * doc->counts[n] / static_cast<double>(doc->total));
+		cbhz_prod *= temp;
+	}
+
+	while (converged > var_converged && (var_iter < var_max_iter || var_max_iter == -1))
+	{
+		var_iter++;
+		for (n = 0; n < doc->length; n++)
+		{
+			phisum = 0.0;
+			temp = 0.0;
+			for (k = 0; k < num_topics; k++)
+			{
+				cbhz_params[k] = exp(topic_beta[k] * doc->counts[n] / static_cast<double>(doc->total)); // Only exponentiate once
+				temp += phi[n][k] * cbhz_params[k];
+				oldphi[k] = phi[n][k];
+			}
+			cbhz_prod /= temp; //remove the contribution of word n
+
+			for (k = 0; k < num_topics; k++)
+			{
+				phi[n][k] =
+					dig[k] + ddelta[k][doc->words[n]] //LDA update. digamma(sum(var_gamma)) is a constant across the topic distribution for each word so is dropped from the update
+					+ (static_cast<double>(doc->label) * topic_beta[k] * doc->counts[n] / static_cast<double>(doc->total)) //contribution to Cox model of an event
+					- (cbz * cbhz_params[k] * cbhz_prod); // update phi given gamma note, phi is in log space
+				//In slda - sum_no.n(phi*exp(beta*counts))*n.exp(beta*counts)/sum_no(phi*exp(beta*counts))
+				if (k > 0)
+					phisum = log_sum(phisum, phi[n][k]);
+				else
+					phisum = phi[n][k]; // note, phi is in log space
+				//std::cout << " phisum = " << phisum << std::endl;
+			}
+
+			for (k = 0; k < num_topics; k++)
+			{
+				phi[n][k] = exp(phi[n][k] - phisum); //normalise phi into exp space 
+				var_gamma[k] = var_gamma[k] + (doc->counts[n] * (phi[n][k] - oldphi[k]));  //Update the gamma given phi (document topic distribution updated by new word allocations)
+				dig[k] = boost::math::digamma(var_gamma[k]);
+				//	std::cout << "topic k results = " << k << std::endl;
+				//	std::cout << "phi = " << phi[n][k] << " var_gamma[k] " << var_gamma[k] << " dig[k] " << dig[k] << std::endl;
+			}
+
+			temp = 0.0;
+			for (k = 0; k < num_topics; k++)
+				temp += phi[n][k] * cbhz_params[k];
+
+			cbhz_prod *= temp; //multiply back in the updated contribution for word n
+
+		}
+
+		likelihood = sslda_compute_likelihood(doc, phi, var_gamma, dig);
+		converged = fabs((likelihood_old - likelihood) / likelihood_old);
+		likelihood_old = likelihood;
+		//std::cout << "likelihood = "<< likelihood << std::endl;
+	}
+
+	return likelihood;
+}*/
 
 double sslda::sslda_inference(document* doc, double* var_gamma, double** phi, double* oldphi, double* dig, double* cbhz_params, const double var_converged, const int var_max_iter)
 {
 	int k, n, var_iter;
 	double converged = 1.0, phisum = 0.0, likelihood = 0.0, likelihood_old = 0.0;
 	double cbhz_prod = 1.0, temp = 0.0;
-	double cbz = cumbasehaz[doc->t_exit- time_start];
-	double cbeta = 0.0;
 
     // compute posterior dirichlet
     for (k = 0; k < num_topics ; k++)
@@ -1638,13 +1716,6 @@ double sslda::sslda_inference(document* doc, double* var_gamma, double** phi, do
     var_iter = 0;
 
 
-	if (covariatesN > 0)
-	{
-		for (n = 0; n < covariatesN; n++)
-			cbeta += cov_beta[n] * static_cast<double>(doc->covariates[n]);
-		cbz *= exp(cbeta);
-
-	}
 	cbhz_prod = 1.0;
 	for (n = 0; n < doc->length; n ++)
 	{
@@ -1670,26 +1741,27 @@ double sslda::sslda_inference(document* doc, double* var_gamma, double** phi, do
 			cbhz_prod /= temp; //remove the contribution of word n
 
 			for (k = 0; k < num_topics; k++)
-			{	
-
-				phi[n][k] = 
+			{
+				phi[n][k] =
 					dig[k] + ddelta[k][doc->words[n]] //LDA update. digamma(sum(var_gamma)) is a constant across the topic distribution for each word so is dropped from the update
 					+ (static_cast<double>(doc->label) * topic_beta[k] * doc->counts[n] / static_cast<double>(doc->total)) //contribution to Cox model of an event
-					- (cbz * cbhz_params[k] * cbhz_prod ); // update phi given gamma note, phi is in log space
+					- (cbhz_params[k] * cbhz_prod); // update phi given gamma note, phi is in log space
+		//		std::cout << "phi = " << phi[n][k] << std::endl;
+
+				//In slda - sum_no.n(phi*exp(beta*counts))*n.exp(beta*counts)/sum_no(phi*exp(beta*counts))
 				if (k > 0)
 					phisum = log_sum(phisum, phi[n][k]);
 				else
 					phisum = phi[n][k]; // note, phi is in log space
-				//std::cout << " phisum = " << phisum << std::endl;
 			}
-
-			for (k = 0; k < num_topics; k++)
+		//	std::cout << " phisum = " << phisum << std::endl;
+			for (k = 0; k < num_topics;k++)
 			{
 				phi[n][k] = exp(phi[n][k] - phisum); //normalise phi into exp space 
 				var_gamma[k] = var_gamma[k] + (doc->counts[n] * (phi[n][k] - oldphi[k]));  //Update the gamma given phi (document topic distribution updated by new word allocations)
 				dig[k] = boost::math::digamma(var_gamma[k]);
-			//	std::cout << "topic k results = " << k << std::endl;
-			//	std::cout << "phi = " << phi[n][k] << " var_gamma[k] " << var_gamma[k] << " dig[k] " << dig[k] << std::endl;
+		//		std::cout << "topic k results = " << k << std::endl;
+		//		std::cout << "phi = " << phi[n][k] << " var_gamma[k] " << var_gamma[k] << " dig[k] " << dig[k] << std::endl;
 			}
 			
 			temp = 0.0;

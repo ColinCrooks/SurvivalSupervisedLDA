@@ -49,7 +49,8 @@ int cox_reg(
 	double lambda, 
 	const suffstats * ss,  
 	double * f, 
-	const settings* setting
+	const settings* setting,
+	int base
 	);
 
 double cox_reg_cross_val(
@@ -59,7 +60,8 @@ double cox_reg_cross_val(
 	int nvar, 
 	double lambda, 
 	const suffstats * ss, 
-	const settings* setting
+	const settings* setting, 
+	int base
 	);
 
 int cox_reg_sparse(
@@ -71,7 +73,6 @@ int cox_reg_sparse(
 	const suffstats * ss,
 	double * f,
 	const settings* setting);
-
 
 
 #endif // OPT_H_INCLUDED

@@ -85,8 +85,7 @@ public:
 	double sslda_inference(document* doc, double* var_gamma, double** phi, double* oldphi, double* dig, double* cbhz_params, const double var_converged, const int var_max_iter);
     double sslda_compute_likelihood(document* doc, double** phi, double* var_gamma, double* dig);
 	double infer_only(const corpus * c, const settings * setting, double *AIC, double *loglik, const char * directory, int save);
-
-
+	
 public:
     double*  alpha; // the parameter for the per corpus topic dirichlet
 	double* eta; //  the paramenter for the per topic word dirichlet
@@ -98,12 +97,10 @@ public:
 	int time_start; // earliest time 
     int size_vocab; // number of unique word codes
 	int * events = nullptr; //event counts at each time point
-	double * topic_logprob = nullptr;  // 
 	double * basehaz = nullptr; // baseline hazard 
 	double * cumbasehaz = nullptr; // cummulative baseline hazard
 	double *topic_beta = nullptr; //beta for the latent topic hazard ratios
 	double * cov_beta = nullptr; // beta for the additional covariates adjusted for
-	double ** delta = nullptr; // parameter for the topic word dirichlet 
 	double ** ddelta = nullptr; // expectation of the topic word dirichlet
 	double  ldelta; // log likelihood component from the word topic dirichlet 
 };

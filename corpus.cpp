@@ -239,8 +239,8 @@ int corpus::sample(corpus* s, corpus* s_val, const settings* setting)
 				{
 					doc->covariates = new double[setting->ADJN];
 					doc->covariates[0] = 1.0;
-					for (int w = 1; w < setting->ADJN; w++) //already ADJN has +1 for baseline in settings.h
-						doc->covariates[w] = docs[d]->covariates[w];
+					for (int covn = 1; covn < setting->ADJN; covn++) //already ADJN has +1 for baseline in settings.h
+						doc->covariates[covn] = docs[d]->covariates[covn];
 				}
 				s->docs.push_back(doc);
 				nd++;
@@ -278,8 +278,8 @@ int corpus::sample(corpus* s, corpus* s_val, const settings* setting)
 				{
 					doc->covariates = new double[setting->ADJN];
 					doc->covariates[0] = 1.0;
-					for (int w = 1; w < setting->ADJN; w++) //already ADJN has +1 for baseline in settings.h
-						doc->covariates[w] = docs[d]->covariates[w];
+					for (int covn = 1; covn < setting->ADJN; covn++) //already ADJN has +1 for baseline in settings.h
+						doc->covariates[covn] = docs[d]->covariates[covn];
 				}
 				s_val->docs.push_back(doc);
 				snd++;
