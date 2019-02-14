@@ -981,7 +981,7 @@ double sslda::mle(suffstats * ss, int BETA_UPDATE, const settings * setting)
 
 	double max_ss(0.0);
 	int base_index(0);
-	for (int i = 0; i < num_topics; i++) 
+	for (i = 0; i < num_topics; i++) 
 	{
 		if (max_ss < ss->word_total_ss[i]) 
 		{
